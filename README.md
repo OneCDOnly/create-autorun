@@ -10,7 +10,7 @@ This installer script writes an autorun.sh processor into your default volume, b
 
 ## Running the installer
 
-    bash <(curl -kO https://raw.githubusercontent.com/onecdonly/create-autorun/master/create-autorun.sh)
+    curl -sk https://raw.githubusercontent.com/onecdonly/create-autorun/master/create-autorun.sh | bash
 
 ## Notes
 
