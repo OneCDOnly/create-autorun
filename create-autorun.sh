@@ -3,7 +3,7 @@
 # create-atorun.sh - (C)opyright 2017-2018 OneCD [one.cd.only@gmail.com]
 #
 # Create an autorun environment suited to this model QNAP NAS.
-# Tested on QTS 4.2.6 #20180711 running on a QNAP TS-559 Pro+.
+# Tested on QTS 4.2.6 #20180829 running on a QNAP TS-559 Pro+.
 #
 # For more info: [https://forum.qnap.com/viewtopic.php?f=45&t=130345]
 #
