@@ -73,7 +73,12 @@ FindDOMPartition()
         DOM_partition="${NAS_DOM_NODE}${NAS_DOM_PART}"
     else
         if [[ -e /sbin/hal_app ]]; then
-            DOM_partition="$(/sbin/hal_app --get_boot_pd port_id=0)6"
+            DOM_partition="$(/sbin/hal_app --get_boot_pd port_id=0)"
+            if [[ $NAS_MODEL = TS-X28A ]]; then
+                DOM_partition+=5
+            else
+                DOM_partition+=6
+            fi
         elif [[ $NAS_ARC = TS-NASARM ]]; then
             DOM_partition=/dev/mtdblock5
         else
