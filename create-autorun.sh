@@ -33,7 +33,7 @@ Init()
 
     local SCRIPT_FILE='create-autorun.sh'
     local SCRIPT_NAME="${SCRIPT_FILE%.*}"
-    local SCRIPT_VERSION='180916'
+    local SCRIPT_VERSION='181102'
 
     local NAS_BOOT_PATHFILE='/etc/default_config/BOOT.conf'
     local NAS_PLATFORM_PATHFILE='/etc/platform.conf'
@@ -292,9 +292,9 @@ ShowResult()
     echo
 
     if [[ $exitcode -eq 0 ]]; then
-        ShowSuccess 'Autorun successfully installed!'
+        ShowSuccess 'autorun.sh successfully created!'
     else
-        ShowFailed 'Autorun installation failed!'
+        ShowFailed 'autorun.sh creation failed!'
     fi
 
     echo
