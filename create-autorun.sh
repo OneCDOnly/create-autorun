@@ -31,16 +31,16 @@ Init()
 
     FindDefVol
 
-    local SCRIPT_FILE='create-autorun.sh'
+    local SCRIPT_FILE=create-autorun.sh
     local SCRIPT_NAME="${SCRIPT_FILE%.*}"
-    local SCRIPT_VERSION='181102'
+    local SCRIPT_VERSION=181102
 
-    local NAS_BOOT_PATHFILE='/etc/default_config/BOOT.conf'
-    local NAS_PLATFORM_PATHFILE='/etc/platform.conf'
-    local NAS_CONFIG_PATHFILE='/etc/config/uLinux.conf'
+    local NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
+    local NAS_PLATFORM_PATHFILE=/etc/platform.conf
+    local NAS_CONFIG_PATHFILE=/etc/config/uLinux.conf
 
     NAS_ARC=$(<"$NAS_BOOT_PATHFILE")
-    local NAS_MODEL=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Model')
+    NAS_MODEL=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Model')
     local NAS_MODEL_DISPLAY=$(getcfg -f "$NAS_PLATFORM_PATHFILE" 'MISC' 'DISPLAY_NAME')
     local QTS_VERSION=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Version')
     local QTS_BUILD=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Build Number')
@@ -55,7 +55,7 @@ Init()
     ShowInfo 'default volume' "$DEF_VOLMP"
     echo
 
-    AUTORUN_FILE='autorun.sh'
+    AUTORUN_FILE=autorun.sh
     AUTORUN_PATH="${DEF_VOLMP}/.system/autorun"
     SCRIPT_STORE_PATH="${AUTORUN_PATH}/scripts"
     MOUNT_BASE_PATH="/tmp/$SCRIPT_NAME"
@@ -74,10 +74,10 @@ FindDOMPartition()
     else
         if [[ -e /sbin/hal_app ]]; then
             DOM_partition="$(/sbin/hal_app --get_boot_pd port_id=0)6"
-        elif [[ $NAS_ARC = 'TS-NASARM' ]]; then
-            DOM_partition='/dev/mtdblock5'
+        elif [[ $NAS_ARC = TS-NASARM ]]; then
+            DOM_partition=/dev/mtdblock5
         else
-            DOM_partition='/dev/sdx6'
+            DOM_partition=/dev/sdx6
         fi
     fi
 
@@ -134,7 +134,7 @@ MountDOMPartition()
 
             if [[ $mount_type != ext4 ]]; then
                 mount_type=ext4
-                mount_dev='/dev/mmcblk0p7'
+                mount_dev=/dev/mmcblk0p7
                 continue
             else
                 ShowFailed "Unable to mount ($mount_type) DOM partition ($mount_dev)! Error: [$orig_result]"
