@@ -26,6 +26,11 @@
 Init()
     {
 
+    if [[ ! -e /etc/init.d/functions ]]; then
+        ShowError "QTS functions missing. Is this a QNAP NAS?"
+        exit 1
+    fi
+
     # include QNAP functions
     . /etc/init.d/functions
 
@@ -45,8 +50,8 @@ Init()
     NAS_DOM_PART=$(getcfg 'CONFIG STORAGE' 'FS_ACTIVE_PARTITION' -f $NAS_PLATFORM_PATHFILE)
     NAS_DOM_FS=$(getcfg 'CONFIG STORAGE' 'FS_TYPE' -f $NAS_PLATFORM_PATHFILE)
 
-    echo
-    ShowInfo 'script version' "$SCRIPT_VERSION"
+    echo -e "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)\n"
+
     ShowInfo 'NAS model' "$NAS_MODEL ($(getcfg 'MISC' 'DISPLAY_NAME' -d 'display name unknown' -f $NAS_PLATFORM_PATHFILE))"
     ShowInfo 'QTS version' "$(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number' -f $NAS_CONFIG_PATHFILE)"
     ShowInfo 'default volume' $DEF_VOLMP
@@ -84,9 +89,9 @@ FindDOMPartition()
     fi
 
     if [[ -n $DOM_partition ]]; then
-        ShowSuccess 'DOM partition found' "$DOM_partition"
+        ShowDone "DOM partition found ($DOM_partition)"
     else
-        ShowFailed 'Unable to find the DOM partition!'
+        ShowError 'unable to find the DOM partition!'
         exitcode=2
     fi
 
@@ -100,7 +105,7 @@ CreateMountPoint()
     DOM_mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
     if [[ $? -ne 0 ]]; then
-        ShowFailed "Unable to create a DOM mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
+        ShowError "unable to create a DOM mount-point! [$MOUNT_BASE_PATH.XXXXXX]"
         exitcode=3
     fi
 
@@ -118,12 +123,12 @@ MountDOMPartition()
         result_msg=$(/sbin/ubiattach -m "$NAS_DOM_PART" -d 2 2>&1)
 
         if [[ $? -eq 0 ]]; then
-            ShowSuccess "ubiattached DOM partition" $NAS_DOM_PART
+            ShowDone "ubiattached DOM partition ($NAS_DOM_PART)"
             mount_type=ubifs
             mount_dev=ubi2:config
         else
-            ShowFailed "Unable to ubiattach! [$result_msg]"
-            ShowInfo "Will try as EXT4 instead"
+            ShowError "unable to ubiattach! [$result_msg]"
+            ShowInfo "will try as EXT4 instead"
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
         fi
@@ -135,10 +140,10 @@ MountDOMPartition()
     result_msg=$(/bin/mount -t $mount_type $mount_dev $DOM_mount_point 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowSuccess "mounted ($mount_type) DOM partition at" "$DOM_mount_point"
+        ShowDone "mounted ($mount_type) DOM partition at [$DOM_mount_point]"
         mount_flag=true
     else
-        ShowFailed "Unable to mount ($mount_type) DOM partition ($mount_dev)! Error: [$result_msg]"
+        ShowError "unable to mount ($mount_type) DOM partition ($mount_dev)! Error: [$result_msg]"
         mount_flag=false
         exitcode=4
     fi
@@ -152,7 +157,7 @@ ConfirmDOMPartition()
 
     # look for a known file
     if [[ ! -e ${DOM_mount_point}/uLinux.conf ]]; then
-        ShowFailed 'DOM tag-file was not found!'
+        ShowError 'DOM tag-file was not found!'
         exitcode=6
     fi
 
@@ -166,7 +171,7 @@ CreateScriptStore()
     mkdir -p "$SCRIPT_STORE_PATH" 2> /dev/null
 
     if [[ $? -ne 0 ]]; then
-        ShowFailed "Unable to create script store! ($SCRIPT_STORE_PATH)"
+        ShowError "unable to create script store! ($SCRIPT_STORE_PATH)"
         exitcode=7
     fi
 
@@ -200,7 +205,7 @@ done
 EOF
 
     if [[ $? -ne 0 ]]; then
-        ShowFailed "Unable to create script processor! ($autorun_processor_pathfile)"
+        ShowError "unable to create script processor! [$autorun_processor_pathfile]"
         exitcode=8
         return
     fi
@@ -232,9 +237,9 @@ BackupExistingAutorun()
         cp "$AUTORUN_LINK_PATHFILE" "$backup_pathfile"
 
         if [[ $? -eq 0 ]]; then
-            ShowSuccess "backed-up existing [$AUTORUN_FILE] to" "$backup_pathfile"
+            ShowDone "backed-up existing [$AUTORUN_FILE] to [$backup_pathfile]"
         else
-            ShowFailed "Unable to backup existing file! ($AUTORUN_FILE)"
+            ShowError "unable to backup existing file! [$AUTORUN_FILE]"
             exitcode=9
         fi
     fi
@@ -249,7 +254,7 @@ AddLinkToStartup()
     ln -sf "$autorun_processor_pathfile" "$AUTORUN_LINK_PATHFILE"
 
     if [[ $? -ne 0 ]]; then
-        ShowFailed 'Unable to create symlink!'
+        ShowError 'unable to create symlink!'
         exitcode=10
     fi
 
@@ -265,10 +270,10 @@ UnmountDOMPartition()
     result_msg=$(/bin/umount "$DOM_mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowSuccess "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
+        ShowDone "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
         mount_flag=false
     else
-        ShowFailed "Unable to unmount ($mount_type) DOM partition! Error: [$result_msg]"
+        ShowError "unable to unmount ($mount_type) DOM partition! Error: [$result_msg]"
         exitcode=11
     fi
 
@@ -290,48 +295,98 @@ ShowResult()
     echo
 
     if [[ $exitcode -eq 0 ]]; then
-        ShowSuccess '[autorun.sh] successfully created!'
+        ShowDone '[autorun.sh] successfully created!'
     else
-        ShowFailed '[autorun.sh] creation failed!'
+        ShowError '[autorun.sh] creation failed!'
     fi
 
     echo
 
     }
 
-ShowSuccess()
-    {
-
-    ShowLogLine '√' "$1" "$2"
-
-    }
-
-ShowFailed()
-    {
-
-    ShowLogLine 'X' "$1"
-
-    }
-
 ShowInfo()
     {
 
-    ShowLogLine '*' "$1" "$2"
+    ShowLogLine_update "$(ColourTextBrightWhite info)" "$1: $2"
 
     }
 
-ShowLogLine()
+ShowDone()
     {
 
-    # $1 = pass/fail symbol
-    # $2 = parameter
-    # $3 = value (optional)
+    ShowLogLine_update "$(ColourTextBrightGreen done)" "$1"
 
-    if [[ -n $3 ]]; then
-        printf ' %-1s %-35s: %s\n' "$1" "$2" "$3"
-    else
-        printf ' %-1s %-35s\n' "$1" "$2"
+    }
+
+ShowError()
+    {
+
+    local buffer="$1"
+    local capitalised="$(tr "[a-z]" "[A-Z]" <<< ${buffer:0:1})${buffer:1}"
+
+    ShowLogLine_update "$(ColourTextBrightRed fail)" "$capitalised"
+
+    }
+
+ShowLogLine_update()
+    {
+
+    # updates the previous message
+
+    # $1 = pass/fail
+    # $2 = message
+
+    new_message=$(printf "[ %-10s ] %s" "$1" "$2")
+
+    if [[ $new_message != $previous_msg ]]; then
+        previous_length=$((${#previous_msg}+1))
+        new_length=$((${#new_message}+1))
+
+        # jump to start of line, print new msg
+        strbuffer=$(echo -en "\r$new_message ")
+
+        # if new msg is shorter then add spaces to end to cover previous msg
+        [[ $new_length -lt $previous_length ]] && { appended_length=$(($new_length-$previous_length)); strbuffer+=$(printf "%${appended_length}s") ;}
+
+        echo "$strbuffer"
     fi
+
+    return 0
+
+    }
+
+ColourTextBrightGreen()
+    {
+
+    echo -en '\033[1;32m'"$(PrintResetColours "$1")"
+
+    }
+
+ColourTextBrightOrange()
+    {
+
+    echo -en '\033[1;38;5;214m'"$(PrintResetColours "$1")"
+
+    }
+
+ColourTextBrightRed()
+    {
+
+    echo -en '\033[1;31m'"$(PrintResetColours "$1")"
+
+    }
+
+ColourTextBrightWhite()
+    {
+
+    echo -en '\033[1;97m'"$(PrintResetColours "$1")"
+
+    }
+
+PrintResetColours()
+    {
+
+    echo -en "$1"'\033[0m'
 
     }
 
