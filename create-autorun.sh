@@ -32,33 +32,30 @@ Init()
     FindDefVol
 
     local SCRIPT_FILE=create-autorun.sh
-    local SCRIPT_NAME="${SCRIPT_FILE%.*}"
-    local SCRIPT_VERSION=181102
+    local SCRIPT_NAME=${SCRIPT_FILE%.*}
+    local SCRIPT_VERSION=190506
 
     local NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
     local NAS_PLATFORM_PATHFILE=/etc/platform.conf
     local NAS_CONFIG_PATHFILE=/etc/config/uLinux.conf
 
     NAS_ARC=$(<"$NAS_BOOT_PATHFILE")
-    NAS_MODEL=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Model')
-    local NAS_MODEL_DISPLAY=$(getcfg -f "$NAS_PLATFORM_PATHFILE" 'MISC' 'DISPLAY_NAME')
-    local QTS_VERSION=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Version')
-    local QTS_BUILD=$(getcfg -f "$NAS_CONFIG_PATHFILE" 'System' 'Build Number')
-    NAS_DOM_NODE=$(getcfg -f "$NAS_PLATFORM_PATHFILE" 'CONFIG STORAGE' 'DEVICE_NODE')
-    NAS_DOM_PART=$(getcfg -f "$NAS_PLATFORM_PATHFILE" 'CONFIG STORAGE' 'FS_ACTIVE_PARTITION')
-    NAS_DOM_FS=$(getcfg -f "$NAS_PLATFORM_PATHFILE" 'CONFIG STORAGE' 'FS_TYPE')
+    NAS_MODEL=$(getcfg 'System' 'Model' -f $NAS_CONFIG_PATHFILE)
+    NAS_DOM_NODE=$(getcfg 'CONFIG STORAGE' 'DEVICE_NODE' -f $NAS_PLATFORM_PATHFILE)
+    NAS_DOM_PART=$(getcfg 'CONFIG STORAGE' 'FS_ACTIVE_PARTITION' -f $NAS_PLATFORM_PATHFILE)
+    NAS_DOM_FS=$(getcfg 'CONFIG STORAGE' 'FS_TYPE' -f $NAS_PLATFORM_PATHFILE)
 
     echo
     ShowInfo 'script version' "$SCRIPT_VERSION"
-    ShowInfo 'NAS model' "$NAS_MODEL ($NAS_MODEL_DISPLAY)"
-    ShowInfo 'QTS version' "$QTS_VERSION #$QTS_BUILD"
-    ShowInfo 'default volume' "$DEF_VOLMP"
+    ShowInfo 'NAS model' "$NAS_MODEL ($(getcfg 'MISC' 'DISPLAY_NAME' -d 'display name unknown' -f $NAS_PLATFORM_PATHFILE))"
+    ShowInfo 'QTS version' "$(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number' -f $NAS_CONFIG_PATHFILE)"
+    ShowInfo 'default volume' $DEF_VOLMP
     echo
 
     AUTORUN_FILE=autorun.sh
-    AUTORUN_PATH="${DEF_VOLMP}/.system/autorun"
-    SCRIPT_STORE_PATH="${AUTORUN_PATH}/scripts"
-    MOUNT_BASE_PATH="/tmp/$SCRIPT_NAME"
+    AUTORUN_PATH=$DEF_VOLMP/.system/autorun
+    SCRIPT_STORE_PATH=$AUTORUN_PATH/scripts
+    MOUNT_BASE_PATH=/tmp/$SCRIPT_NAME
 
     exitcode=0
 
@@ -70,10 +67,10 @@ FindDOMPartition()
     [[ $exitcode -gt 0 ]] && return
 
     if [[ -n $NAS_DOM_NODE ]]; then
-        DOM_partition="${NAS_DOM_NODE}${NAS_DOM_PART}"
+        DOM_partition=${NAS_DOM_NODE}${NAS_DOM_PART}
     else
         if [[ -e /sbin/hal_app ]]; then
-            DOM_partition="$(/sbin/hal_app --get_boot_pd port_id=0)"
+            DOM_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
             if [[ $NAS_MODEL = TS-X28A ]]; then
                 DOM_partition+=5
             else
@@ -100,10 +97,10 @@ CreateMountPoint()
 
     [[ $exitcode -gt 0 ]] && return
 
-    DOM_mount_point=$(mktemp -d "${MOUNT_BASE_PATH}.XXXXXX" 2> /dev/null)
+    DOM_mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
     if [[ $? -ne 0 ]]; then
-        ShowFailed "Unable to create a DOM mount-point! (${MOUNT_BASE_PATH}.XXXXXX)"
+        ShowFailed "Unable to create a DOM mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
         exitcode=3
     fi
 
@@ -115,40 +112,36 @@ MountDOMPartition()
     [[ $exitcode -gt 0 ]] && return
 
     local mount_dev=''
-    local result=''
-    local orig_result=''
+    local result_msg=''
 
     if [[ $NAS_DOM_FS = ubifs ]]; then
-        ubiattach -m "$NAS_DOM_PART" -d 2 2> /dev/null
-        mount_type=ubifs
-        mount_dev='ubi2:config'
-    else
-        mount_type=ext2
-        mount_dev="$DOM_partition"
-    fi
-
-    while true; do
-        result=$(mount -t "$mount_type" "$mount_dev" "$DOM_mount_point" 2>&1)
+        result_msg=$(/sbin/ubiattach -m "$NAS_DOM_PART" -d 2 2>&1)
 
         if [[ $? -eq 0 ]]; then
-            ShowSuccess "mounted ($mount_type) DOM partition at" "$DOM_mount_point"
-            mount_flag=true
-            break
+            ShowSuccess "ubiattached DOM partition" $NAS_DOM_PART
+            mount_type=ubifs
+            mount_dev=ubi2:config
         else
-            [[ -z $orig_result ]] && orig_result=$result
-
-            if [[ $mount_type != ext4 ]]; then
-                mount_type=ext4
-                mount_dev=/dev/mmcblk0p7
-                continue
-            else
-                ShowFailed "Unable to mount ($mount_type) DOM partition ($mount_dev)! Error: [$orig_result]"
-                mount_flag=false
-                exitcode=4
-                break
-            fi
+            ShowFailed "Unable to ubiattach! [$result_msg]"
+            ShowInfo "Will try as EXT4 instead"
+            mount_type=ext4
+            mount_dev=/dev/mmcblk0p7
         fi
-    done
+    else
+        mount_type=ext2
+        mount_dev=$DOM_partition
+    fi
+
+    result_msg=$(/bin/mount -t $mount_type $mount_dev $DOM_mount_point 2>&1)
+
+    if [[ $? -eq 0 ]]; then
+        ShowSuccess "mounted ($mount_type) DOM partition at" "$DOM_mount_point"
+        mount_flag=true
+    else
+        ShowFailed "Unable to mount ($mount_type) DOM partition ($mount_dev)! Error: [$result_msg]"
+        mount_flag=false
+        exitcode=4
+    fi
 
     }
 
@@ -185,7 +178,7 @@ CreateProcessor()
     [[ $exitcode -gt 0 ]] && return
 
     # write the script directory processor to disk.
-    autorun_processor_pathfile="${AUTORUN_PATH}/${AUTORUN_FILE}"
+    autorun_processor_pathfile="$AUTORUN_PATH/$AUTORUN_FILE"
 
     cat > "$autorun_processor_pathfile" << EOF
 #!/usr/bin/env bash
@@ -223,9 +216,9 @@ BackupExistingAutorun()
 
     AUTORUN_LINK_PATHFILE="${DOM_mount_point}/${AUTORUN_FILE}"
 
-    # copy original autorun.sh to backup location
+    # copy original [autorun.sh] to backup location
     if [[ -e $AUTORUN_LINK_PATHFILE ]]; then
-        # if an autorun.sh.old already exists in backup location, find a new name for it
+        # if an [autorun.sh.old] already exists in backup location, find a new name for it
         backup_pathfile="$autorun_processor_pathfile.prev"
 
         if [[ -e $backup_pathfile ]] ; then
@@ -239,7 +232,7 @@ BackupExistingAutorun()
         cp "$AUTORUN_LINK_PATHFILE" "$backup_pathfile"
 
         if [[ $? -eq 0 ]]; then
-            ShowSuccess "backed-up existing $AUTORUN_FILE to" "$backup_pathfile"
+            ShowSuccess "backed-up existing [$AUTORUN_FILE] to" "$backup_pathfile"
         else
             ShowFailed "Unable to backup existing file! ($AUTORUN_FILE)"
             exitcode=9
@@ -267,19 +260,19 @@ UnmountDOMPartition()
 
     [[ $mount_flag = false ]] && return
 
-    local result=''
+    local result_msg=''
 
-    result=$(umount "$DOM_mount_point" 2>&1)
+    result_msg=$(/bin/umount "$DOM_mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
         ShowSuccess "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
         mount_flag=false
     else
-        ShowFailed "Unable to unmount ($mount_type) DOM partition! Error: [$result]"
+        ShowFailed "Unable to unmount ($mount_type) DOM partition! Error: [$result_msg]"
         exitcode=11
     fi
 
-    [[ $NAS_DOM_FS = ubifs ]] && ubidetach -m "$NAS_DOM_PART"
+    [[ $NAS_DOM_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_DOM_PART"
 
     }
 
@@ -297,9 +290,9 @@ ShowResult()
     echo
 
     if [[ $exitcode -eq 0 ]]; then
-        ShowSuccess 'autorun.sh successfully created!'
+        ShowSuccess '[autorun.sh] successfully created!'
     else
-        ShowFailed 'autorun.sh creation failed!'
+        ShowFailed '[autorun.sh] creation failed!'
     fi
 
     echo
@@ -335,9 +328,9 @@ ShowLogLine()
     # $3 = value (optional)
 
     if [[ -n $3 ]]; then
-        printf ' %-1s %-34s: %s\n' "$1" "$2" "$3"
+        printf ' %-1s %-35s: %s\n' "$1" "$2" "$3"
     else
-        printf ' %-1s %-34s\n' "$1" "$2"
+        printf ' %-1s %-35s\n' "$1" "$2"
     fi
 
     }
