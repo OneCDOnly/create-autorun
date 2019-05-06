@@ -46,10 +46,9 @@ Init()
 
     local NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
     local NAS_PLATFORM_PATHFILE=/etc/platform.conf
-    local NAS_CONFIG_PATHFILE=/etc/config/uLinux.conf
 
     NAS_ARC=$(<"$NAS_BOOT_PATHFILE")
-    NAS_MODEL=$(getcfg 'System' 'Model' -f $NAS_CONFIG_PATHFILE)
+    NAS_MODEL=$(getcfg 'System' 'Model')
     NAS_DOM_NODE=$(getcfg 'CONFIG STORAGE' 'DEVICE_NODE' -f $NAS_PLATFORM_PATHFILE)
     NAS_DOM_PART=$(getcfg 'CONFIG STORAGE' 'FS_ACTIVE_PARTITION' -f $NAS_PLATFORM_PATHFILE)
     NAS_DOM_FS=$(getcfg 'CONFIG STORAGE' 'FS_TYPE' -f $NAS_PLATFORM_PATHFILE)
@@ -57,7 +56,7 @@ Init()
     echo -e "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)\n"
 
     ShowInfo "NAS model: $NAS_MODEL ($(getcfg 'MISC' 'DISPLAY_NAME' -d 'display name unknown' -f $NAS_PLATFORM_PATHFILE))"
-    ShowInfo "QTS version: $(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number' -f $NAS_CONFIG_PATHFILE)"
+    ShowInfo "QTS version: $(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number')"
     ShowInfo "default volume: $DEF_VOLMP"
     echo
 
