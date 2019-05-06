@@ -52,9 +52,9 @@ Init()
 
     echo -e "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)\n"
 
-    ShowInfo 'NAS model' "$NAS_MODEL ($(getcfg 'MISC' 'DISPLAY_NAME' -d 'display name unknown' -f $NAS_PLATFORM_PATHFILE))"
-    ShowInfo 'QTS version' "$(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number' -f $NAS_CONFIG_PATHFILE)"
-    ShowInfo 'default volume' $DEF_VOLMP
+    ShowInfo "NAS model: $NAS_MODEL ($(getcfg 'MISC' 'DISPLAY_NAME' -d 'display name unknown' -f $NAS_PLATFORM_PATHFILE))"
+    ShowInfo "QTS version: $(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number' -f $NAS_CONFIG_PATHFILE)"
+    ShowInfo "default volume: $DEF_VOLMP"
     echo
 
     AUTORUN_FILE=autorun.sh
@@ -128,9 +128,9 @@ MountDOMPartition()
             mount_dev=ubi2:config
         else
             ShowError "unable to ubiattach! [$result_msg]"
-            ShowInfo "will try as EXT4 instead"
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
+            ShowInfo "will try as ($mount_type) instead"
         fi
     else
         mount_type=ext2
@@ -296,6 +296,7 @@ ShowResult()
 
     if [[ $exitcode -eq 0 ]]; then
         ShowDone '[autorun.sh] successfully created!'
+        ShowInfo "place your startup scripts in [$SCRIPT_STORE_PATH]"
     else
         ShowError '[autorun.sh] creation failed!'
     fi
@@ -307,7 +308,7 @@ ShowResult()
 ShowInfo()
     {
 
-    ShowLogLine_update "$(ColourTextBrightWhite info)" "$1: $2"
+    ShowLogLine_update "$(ColourTextBrightOrange info)" "$1"
 
     }
 
