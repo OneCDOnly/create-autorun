@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-############################################################################
-# create-atorun.sh - (C)opyright 2017-2018 OneCD [one.cd.only@gmail.com]
+####################################################################################
+# create-autorun.sh
+#
+# Copyright (C) 2017-2019 OneCD [one.cd.only@gmail.com]
 #
 # Create an autorun environment suited to this model QNAP NAS.
-# Tested on QTS 4.2.6 #20180829 running on a QNAP TS-559 Pro+.
+#
+# Tested on:
+#  QTS 4.2.6 #20190322 running on a QNAP TS-559 Pro+
 #
 # For more info: [https://forum.qnap.com/viewtopic.php?f=45&t=130345]
 #
@@ -21,7 +25,7 @@
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see http://www.gnu.org/licenses/.
-############################################################################
+####################################################################################
 
 Init()
     {
