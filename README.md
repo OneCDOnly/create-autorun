@@ -5,12 +5,12 @@ This is a run-once BASH script to create an autorun environment on your QNAP NAS
 
 ## What it does
 
-This installer script writes an autorun.sh processor into your default volume, below the .system directory. It then symlinks this into the DOM so that it's triggered on NAS startup. It also creates a scripts directory for your own custom creations and NAS modifications. Everything in the scripts directory is run (in order) during NAS startup.
+This installer script writes an **autorun.sh** processor into your default volume, below the **.system directory**. It then symlinks this into the DOM so that it's triggered on NAS startup. It also creates a scripts directory for your own custom creations and NAS modifications. Everything in the scripts directory is run (in order) during NAS startup.
 
 
 ## Running the installer
 
-    curl -sk https://raw.githubusercontent.com/onecdonly/create-autorun/master/create-autorun.sh | bash
+    curl -skL https://git.io/create-autorun.sh | bash
 
 ## Notes
 
