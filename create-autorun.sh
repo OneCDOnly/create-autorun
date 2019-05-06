@@ -143,7 +143,7 @@ MountDOMPartition()
         ShowDone "mounted ($mount_type) DOM partition at [$DOM_mount_point]"
         mount_flag=true
     else
-        ShowError "unable to mount ($mount_type) DOM partition ($mount_dev)! Error: [$result_msg]"
+        ShowError "unable to mount ($mount_type) DOM partition ($mount_dev)! [$result_msg]"
         mount_flag=false
         exitcode=4
     fi
@@ -273,7 +273,7 @@ UnmountDOMPartition()
         ShowDone "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
         mount_flag=false
     else
-        ShowError "unable to unmount ($mount_type) DOM partition! Error: [$result_msg]"
+        ShowError "unable to unmount ($mount_type) DOM partition! [$result_msg]"
         exitcode=11
     fi
 
