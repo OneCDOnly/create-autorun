@@ -42,7 +42,7 @@ Init()
 
     local SCRIPT_FILE=create-autorun.sh
     local SCRIPT_NAME=${SCRIPT_FILE%.*}
-    local SCRIPT_VERSION=190506
+    local SCRIPT_VERSION=191105
 
     local NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
     local NAS_PLATFORM_PATHFILE=/etc/platform.conf
@@ -79,11 +79,14 @@ FindDOMPartition()
     else
         if [[ -e /sbin/hal_app ]]; then
             DOM_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
-            if [[ $NAS_MODEL = TS-X28A ]]; then
-                DOM_partition+=5
-            else
-                DOM_partition+=6
-            fi
+            case $NAS_MODEL in
+                TS-X28A|TS-XA28A)
+                    DOM_partition+=5
+                    ;;
+                *)
+                    DOM_partition+=6
+                    ;;
+            esac
         elif [[ $NAS_ARC = TS-NASARM ]]; then
             DOM_partition=/dev/mtdblock5
         else
@@ -299,7 +302,7 @@ ShowResult()
 
     if [[ $exitcode -eq 0 ]]; then
         ShowDone '[autorun.sh] successfully created!'
-        ShowInfo "place your startup scripts in [$SCRIPT_STORE_PATH]"
+        ShowInfo "place your startup scripts into [$SCRIPT_STORE_PATH]"
     else
         ShowError '[autorun.sh] creation failed!'
     fi
