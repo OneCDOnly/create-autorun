@@ -14,7 +14,7 @@ This installer script writes an **autorun.sh** processor into your default volum
 
 ## Notes
 
-- For those with QTS 4.3.x, you'll also need to let QTS know that it should permit the autorun.sh script to execute. Navigate to Control Panel -> System -> Hardware, then enable the option "Run user defined processes during startup".
+- For those with QTS > 4.3.x, you'll also need to let QTS know that it should permit the autorun.sh script to execute. Navigate to Control Panel -> System -> Hardware, then enable the option "Run user defined processes during startup".
 
 - The location of the autorun system will depend on your default volume name. For example: my default volume is 'MD0_DATA', so the automatic processor is created at:
     /share/MD0_DATA/.system/autorun/autorun.sh
