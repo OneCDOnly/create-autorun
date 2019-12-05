@@ -8,6 +8,7 @@
 #
 # Tested on:
 #  QTS 4.2.6 #20190322 running on a QNAP TS-559 Pro+
+#  QTS 4.4.1 #20191204 running on a QNAP TS-832X-8
 #
 # For more info: [https://forum.qnap.com/viewtopic.php?f=45&t=130345]
 #
