@@ -8,7 +8,7 @@
 # confirm [uLinux.conf] exists on the mounted DOM partition.
 #
 # Tested on:
-#  QTS 4.2.6 #20190322 running on a QNAP TS-559 Pro+
+#  QTS 4.2.6 #20200821 running on a QNAP TS-559 Pro+
 #  QTS 4.4.1 #20191204 running on a QNAP TS-832X-8
 #
 # For more info: [https://forum.qnap.com/viewtopic.php?f=45&t=130345]
@@ -32,40 +32,38 @@
 Init()
     {
 
-    if [[ ! -e /etc/init.d/functions ]]; then
-        ShowError "QTS functions missing. Is this a QNAP NAS?"
-        exit 1
-    fi
+    local -r SCRIPT_FILE=create-autorun-nocheck.sh
+    local -r SCRIPT_VERSION=201007
 
     # include QNAP functions
-    . /etc/init.d/functions
+    if [[ ! -e /etc/init.d/functions ]]; then
+        ShowAsError "QTS functions missing (is this a QNAP NAS?): aborting ..."
+        return 1
+    else
+        . /etc/init.d/functions
+    fi
 
     FindDefVol
 
-    local SCRIPT_FILE=create-autorun-nocheck.sh
-    local SCRIPT_NAME=${SCRIPT_FILE%.*}
-    local SCRIPT_VERSION=200507
+    local -r NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
+    local -r NAS_PLATFORM_PATHFILE=/etc/platform.conf
 
-    local NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
-    local NAS_PLATFORM_PATHFILE=/etc/platform.conf
+    readonly NAS_ARC=$(<"$NAS_BOOT_PATHFILE")
+    readonly NAS_DOM_NODE=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f $NAS_PLATFORM_PATHFILE)
+    readonly NAS_DOM_PART=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f $NAS_PLATFORM_PATHFILE)
+    readonly NAS_DOM_FS=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f $NAS_PLATFORM_PATHFILE)
 
-    NAS_ARC=$(<"$NAS_BOOT_PATHFILE")
-    NAS_MODEL=$(getcfg 'System' 'Model')
-    NAS_DOM_NODE=$(getcfg 'CONFIG STORAGE' 'DEVICE_NODE' -f $NAS_PLATFORM_PATHFILE)
-    NAS_DOM_PART=$(getcfg 'CONFIG STORAGE' 'FS_ACTIVE_PARTITION' -f $NAS_PLATFORM_PATHFILE)
-    NAS_DOM_FS=$(getcfg 'CONFIG STORAGE' 'FS_TYPE' -f $NAS_PLATFORM_PATHFILE)
+    readonly AUTORUN_FILE=autorun.sh
+    readonly AUTORUN_PATH=$DEF_VOLMP/.system/autorun
+    readonly SCRIPT_STORE_PATH=$AUTORUN_PATH/scripts
+    readonly MOUNT_BASE_PATH=/tmp/${SCRIPT_FILE%.*}
+    readonly AUTORUN_PROCESSOR_PATHFILE=$AUTORUN_PATH/$AUTORUN_FILE
 
-    echo -e "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)\n"
-
-    ShowInfo "NAS model: $NAS_MODEL ($(getcfg 'MISC' 'DISPLAY_NAME' -d 'display name unknown' -f $NAS_PLATFORM_PATHFILE))"
-    ShowInfo "QTS version: $(getcfg 'System' 'Version') #$(getcfg 'System' 'Build Number')"
-    ShowInfo "default volume: $DEF_VOLMP"
+    echo "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)"
     echo
-
-    AUTORUN_FILE=autorun.sh
-    AUTORUN_PATH=$DEF_VOLMP/.system/autorun
-    SCRIPT_STORE_PATH=$AUTORUN_PATH/scripts
-    MOUNT_BASE_PATH=/tmp/$SCRIPT_NAME
+    ShowAsInfo "NAS model: $(get_display_name)"
+    ShowAsInfo "QTS version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
+    ShowAsInfo "default volume: $DEF_VOLMP"
 
     exitcode=0
 
@@ -81,7 +79,7 @@ FindDOMPartition()
     else
         if [[ -e /sbin/hal_app ]]; then
             DOM_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
-            case $NAS_MODEL in
+            case $(/sbin/getcfg 'System' 'Model') in
                 TS-X28A|TS-XA28A)
                     DOM_partition+=5
                     ;;
@@ -97,9 +95,9 @@ FindDOMPartition()
     fi
 
     if [[ -n $DOM_partition ]]; then
-        ShowDone "DOM partition found ($DOM_partition)"
+        ShowAsDone "DOM partition found ($DOM_partition)"
     else
-        ShowError 'unable to find the DOM partition!'
+        ShowAsError 'unable to find the DOM partition!'
         exitcode=2
     fi
 
@@ -113,7 +111,7 @@ CreateMountPoint()
     DOM_mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
     if [[ $? -ne 0 ]]; then
-        ShowError "unable to create a DOM mount-point! [$MOUNT_BASE_PATH.XXXXXX]"
+        ShowAsError "unable to create a DOM mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
         exitcode=3
     fi
 
@@ -131,29 +129,42 @@ MountDOMPartition()
         result_msg=$(/sbin/ubiattach -m "$NAS_DOM_PART" -d 2 2>&1)
 
         if [[ $? -eq 0 ]]; then
-            ShowDone "ubiattached DOM partition ($NAS_DOM_PART)"
+            ShowAsDone "ubiattached DOM partition ($NAS_DOM_PART)"
             mount_type=ubifs
             mount_dev=ubi2:config
         else
-            ShowError "unable to ubiattach! [$result_msg]"
+            ShowAsError "unable to ubiattach! [$result_msg]"
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
-            ShowInfo "will try as ($mount_type) instead"
+            ShowAsInfo "will try as ($mount_type) instead"
         fi
     else
         mount_type=ext2
         mount_dev=$DOM_partition
     fi
 
-    result_msg=$(/bin/mount -t $mount_type $mount_dev $DOM_mount_point 2>&1)
+    result_msg=$(/bin/mount -t $mount_type $mount_dev "$DOM_mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowDone "mounted ($mount_type) DOM partition at [$DOM_mount_point]"
+        ShowAsDone "mounted ($mount_type) DOM partition at ($DOM_mount_point)"
         mount_flag=true
     else
-        ShowError "unable to mount ($mount_type) DOM partition ($mount_dev)! [$result_msg]"
+        ShowAsError "unable to mount ($mount_type) DOM partition ($mount_dev)! [$result_msg]"
         mount_flag=false
         exitcode=4
+    fi
+
+    }
+
+ConfirmDOMPartition()
+    {
+
+    [[ $exitcode -gt 0 ]] && return
+
+    # look for a known file
+    if [[ ! -e ${DOM_mount_point}/uLinux.conf ]]; then
+        ShowAsError 'DOM tag-file was not found!'
+        exitcode=6
     fi
 
     }
@@ -166,7 +177,7 @@ CreateScriptStore()
     mkdir -p "$SCRIPT_STORE_PATH" 2> /dev/null
 
     if [[ $? -ne 0 ]]; then
-        ShowError "unable to create script store! ($SCRIPT_STORE_PATH)"
+        ShowAsError "unable to create script store! ($SCRIPT_STORE_PATH)"
         exitcode=7
     fi
 
@@ -178,34 +189,32 @@ CreateProcessor()
     [[ $exitcode -gt 0 ]] && return
 
     # write the script directory processor to disk.
-    autorun_processor_pathfile="$AUTORUN_PATH/$AUTORUN_FILE"
 
-    cat > "$autorun_processor_pathfile" << EOF
+    cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
 #!/usr/bin/env bash
 
-AUTORUN_PATH="$AUTORUN_PATH"
-SCRIPT_STORE_PATH="$SCRIPT_STORE_PATH"
-LOGFILE='/var/log/autorun.log'
+readonly AUTORUN_PATH=$AUTORUN_PATH
+readonly SCRIPT_STORE_PATH=$SCRIPT_STORE_PATH
+readonly LOGFILE=/var/log/autorun.log
 
-echo "\$(date) ----- running autorun.sh -----" >> "\$LOGFILE"
+echo "\$(date) -- autorun.sh is processing --" >> "\$LOGFILE"
 
-for i in \${SCRIPT_STORE_PATH}/*; do
+for i in \$SCRIPT_STORE_PATH/*; do
     if [[ -x \$i ]]; then
         echo -n "\$(date)" >> "\$LOGFILE"
-        echo " - \$i " >> "\$LOGFILE"
+        echo " executing \$i ..." >> "\$LOGFILE"
         \$i 2>&1 >> "\$LOGFILE"
     fi
 done
-
 EOF
 
     if [[ $? -ne 0 ]]; then
-        ShowError "unable to create script processor! [$autorun_processor_pathfile]"
+        ShowAsError "unable to create script processor! ($AUTORUN_PROCESSOR_PATHFILE)"
         exitcode=8
         return
     fi
 
-    chmod +x "$autorun_processor_pathfile"
+    chmod +x "$AUTORUN_PROCESSOR_PATHFILE"
 
     }
 
@@ -214,30 +223,57 @@ BackupExistingAutorun()
 
     [[ $exitcode -gt 0 ]] && return
 
-    AUTORUN_LINK_PATHFILE="${DOM_mount_point}/${AUTORUN_FILE}"
+    DOM_LINKED_PATHFILE=$DOM_mount_point/$AUTORUN_FILE
 
-    # copy original [autorun.sh] to backup location
-    if [[ -e $AUTORUN_LINK_PATHFILE ]]; then
-        # if an [autorun.sh.old] already exists in backup location, find a new name for it
-        backup_pathfile="$autorun_processor_pathfile.prev"
-
-        if [[ -e $backup_pathfile ]] ; then
-            for ((acc=2; acc<=1000; acc++)) ; do
-                [[ ! -e $backup_pathfile.$acc ]] && break
-            done
-
-            backup_pathfile="$backup_pathfile.$acc"
-        fi
-
-        cp "$AUTORUN_LINK_PATHFILE" "$backup_pathfile"
-
-        if [[ $? -eq 0 ]]; then
-            ShowDone "backed-up existing [$AUTORUN_FILE] to [$backup_pathfile]"
-        else
-            ShowError "unable to backup existing file! [$AUTORUN_FILE]"
-            exitcode=9
-        fi
+    if [[ -e $DOM_LINKED_PATHFILE && ! -L $DOM_LINKED_PATHFILE ]]; then
+        [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && Upshift "$AUTORUN_PROCESSOR_PATHFILE.prev"
+        mv "$DOM_LINKED_PATHFILE" "$AUTORUN_PROCESSOR_PATHFILE.prev"
     fi
+
+    }
+
+Upshift()
+    {
+
+    # move specified existing filename by incrementing extension value (upshift extension)
+    # if extension is not a number, then create new extension of '1' and copy file
+
+    # $1 = pathfilename to upshift
+
+    [[ -z $1 ]] && return 1
+    [[ ! -e $1 ]] && return 1
+
+    local ext=''
+    local dest=''
+    local rotate_limit=10
+
+    # keep count of recursive calls
+    local rec_limit=$((rotate_limit*2))
+    local rec_count=0
+    local rec_track_file=/tmp/${FUNCNAME[0]}.count
+    [[ -e $rec_track_file ]] && rec_count=$(<"$rec_track_file")
+    ((rec_count++)); [[ $rec_count -gt $rec_limit ]] && { echo "recursive limit reached!"; rm -f "$rec_track_file"; exit 1 ;}
+    echo $rec_count > "$rec_track_file"
+
+    ext=${1##*.}
+    case $ext in
+        *[!0-9]*)   # specified file extension is not a number so add number and copy it
+            dest="$1.1"
+            [[ -e $dest ]] && Upshift "$dest"
+            cp "$1" "$dest"
+            ;;
+        *)          # extension IS a number, so move it if possible
+            if [[ $ext -lt $((rotate_limit-1)) ]]; then
+                ((ext++)); dest="${1%.*}.$ext"
+                [[ -e $dest ]] && Upshift "$dest"
+                mv "$1" "$dest"
+            else
+                rm "$1"
+            fi
+            ;;
+    esac
+
+    [[ -e $rec_track_file ]] && { rec_count=$(<"$rec_track_file"); ((rec_count--)); echo "$rec_count" > "$rec_track_file" ;}
 
     }
 
@@ -246,10 +282,10 @@ AddLinkToStartup()
 
     [[ $exitcode -gt 0 ]] && return
 
-    ln -sf "$autorun_processor_pathfile" "$AUTORUN_LINK_PATHFILE"
+    ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$DOM_LINKED_PATHFILE"
 
     if [[ $? -ne 0 ]]; then
-        ShowError 'unable to create symlink!'
+        ShowAsError 'unable to create symlink!'
         exitcode=10
     fi
 
@@ -265,10 +301,10 @@ UnmountDOMPartition()
     result_msg=$(/bin/umount "$DOM_mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowDone "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
+        ShowAsDone "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
         mount_flag=false
     else
-        ShowError "unable to unmount ($mount_type) DOM partition! [$result_msg]"
+        ShowAsError "unable to unmount ($mount_type) DOM partition! [$result_msg]"
         exitcode=11
     fi
 
@@ -287,54 +323,77 @@ RemoveMountPoint()
 ShowResult()
     {
 
-    echo
-
     if [[ $exitcode -eq 0 ]]; then
-        ShowDone '[autorun.sh] successfully created!'
-        ShowInfo "place your startup scripts into [$SCRIPT_STORE_PATH]"
+        ShowAsDone '(autorun.sh) successfully created!'
+        ShowAsInfo "please place your startup scripts into ($SCRIPT_STORE_PATH)"
     else
-        ShowError '[autorun.sh] creation failed!'
+        ShowAsError '(autorun.sh) creation failed!'
     fi
 
-    echo
-
     }
 
-ShowInfo()
+ShowAsInfo()
     {
 
-    ShowLogLine_update "$(ColourTextBrightOrange info)" "$1"
+    WriteToDisplay.New "$(ColourTextBrightYellow info)" "$1"
 
     }
 
-ShowDone()
+ShowAsDone()
     {
 
-    ShowLogLine_update "$(ColourTextBrightGreen done)" "$1"
+    WriteToDisplay.New "$(ColourTextBrightGreen 'done')" "$1"
 
     }
 
-ShowError()
+ShowAsError()
     {
 
     local buffer="$1"
-    local capitalised="$(tr "[a-z]" "[A-Z]" <<< ${buffer:0:1})${buffer:1}"
+    local capitalised="$(tr "[a-z]" "[A-Z]" <<< "${buffer:0:1}")${buffer:1}"
 
-    ShowLogLine_update "$(ColourTextBrightRed fail)" "$capitalised"
+    WriteToDisplay.New "$(ColourTextBrightRed fail)" "$capitalised"
 
     }
 
-ShowLogLine_update()
+WriteToDisplay.Wait()
     {
 
-    # updates the previous message
+    # Writes a new message without newline (unless in debug mode)
 
-    # $1 = pass/fail
-    # $2 = message
+    # input:
+    #   $1 = pass/fail
+    #   $2 = message
 
-    new_message=$(printf "[ %-10s ] %s" "$1" "$2")
+    previous_msg=$(printf "%-10s: %s" "$1" "$2")
 
-    if [[ $new_message != $previous_msg ]]; then
+    echo -n "$previous_msg"
+
+    return 0
+
+    }
+
+WriteToDisplay.New()
+    {
+
+    # Updates the previous message
+
+    # input:
+    #   $1 = pass/fail
+    #   $2 = message
+
+    # output:
+    #   stdout = overwrites previous message with updated message
+    #   $previous_length
+    #   $appended_length
+
+    local new_message=''
+    local strbuffer=''
+    local new_length=0
+
+    new_message=$(printf "%-10s: %s" "$1" "$2")
+
+    if [[ $new_message != "$previous_msg" ]]; then
         previous_length=$((${#previous_msg}+1))
         new_length=$((${#new_message}+1))
 
@@ -342,7 +401,10 @@ ShowLogLine_update()
         strbuffer=$(echo -en "\r$new_message ")
 
         # if new msg is shorter then add spaces to end to cover previous msg
-        [[ $new_length -lt $previous_length ]] && { appended_length=$(($new_length-$previous_length)); strbuffer+=$(printf "%${appended_length}s") ;}
+        if [[ $new_length -lt $previous_length ]]; then
+            appended_length=$((new_length-previous_length))
+            strbuffer+=$(printf "%${appended_length}s")
+        fi
 
         echo "$strbuffer"
     fi
@@ -354,42 +416,51 @@ ShowLogLine_update()
 ColourTextBrightGreen()
     {
 
-    echo -en '\033[1;32m'"$(PrintResetColours "$1")"
+    echo -en '\033[1;32m'"$(ColourReset "$1")"
+
+    }
+
+ColourTextBrightYellow()
+    {
+
+    echo -en '\033[1;33m'"$(ColourReset "$1")"
 
     }
 
 ColourTextBrightOrange()
     {
 
-    echo -en '\033[1;38;5;214m'"$(PrintResetColours "$1")"
+    echo -en '\033[1;38;5;214m'"$(ColourReset "$1")"
 
     }
 
 ColourTextBrightRed()
     {
 
-    echo -en '\033[1;31m'"$(PrintResetColours "$1")"
+    echo -en '\033[1;31m'"$(ColourReset "$1")"
 
     }
 
 ColourTextBrightWhite()
     {
 
-    echo -en '\033[1;97m'"$(PrintResetColours "$1")"
+    echo -en '\033[1;97m'"$(ColourReset "$1")"
 
     }
 
-PrintResetColours()
+ColourReset()
     {
 
     echo -en "$1"'\033[0m'
 
     }
 
-Init
+Init || exit 1
+
 FindDOMPartition
 CreateMountPoint
 MountDOMPartition
+#ConfirmDOMPartition
 CreateScriptStore
 CreateProcessor
 BackupExistingAutorun
@@ -397,5 +468,6 @@ AddLinkToStartup
 UnmountDOMPartition
 RemoveMountPoint
 ShowResult
+echo
 
 exit "$exitcode"
