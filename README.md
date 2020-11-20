@@ -10,7 +10,7 @@ This installer script writes an **autorun.sh** processor into your default volum
 
 ## Running the installer
 
-    curl -skL https://git.io/create-autorun.sh | bash
+    curl -skL https://git.io/create-autorun | bash
 
 ## Notes
 
