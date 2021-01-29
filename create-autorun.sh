@@ -2,17 +2,18 @@
 ####################################################################################
 # create-autorun.sh
 #
-# Copyright (C) 2017-2020 OneCD [one.cd.only@gmail.com]
+# Copyright (C) 2017-2021 OneCD [one.cd.only@gmail.com]
 #
 # Create an autorun environment suited to this model QNAP NAS.
 #
 # Tested on:
 #  QTS 4.2.6 #20200821 running on a QNAP TS-559 Pro+
 #  QTS 4.4.1 #20191204 running on a QNAP TS-832X-8
+#  QTS 4.5.1 #20210107 running on a QNAP TS-230
 #
-# For more info: [https://forum.qnap.com/viewtopic.php?f=45&t=130345]
+# For more info: https://forum.qnap.com/viewtopic.php?f=45&t=130345
 #
-# Project source: [https://github.com/OneCDOnly/create-autorun]
+# Project source: https://github.com/OneCDOnly/create-autorun
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -32,7 +33,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=201007
+    local -r SCRIPT_VERSION=210130
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -44,13 +45,10 @@ Init()
 
     FindDefVol
 
-    local -r NAS_BOOT_PATHFILE=/etc/default_config/BOOT.conf
-    local -r NAS_PLATFORM_PATHFILE=/etc/platform.conf
-
-    readonly NAS_ARC=$(<"$NAS_BOOT_PATHFILE")
-    readonly NAS_DOM_NODE=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f $NAS_PLATFORM_PATHFILE)
-    readonly NAS_DOM_PART=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f $NAS_PLATFORM_PATHFILE)
-    readonly NAS_DOM_FS=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f $NAS_PLATFORM_PATHFILE)
+    readonly NAS_ARC=$(</etc/default_config/BOOT.conf)
+    readonly NAS_DOM_NODE=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f /etc/platform.conf)
+    readonly NAS_DOM_PART=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f /etc/platform.conf)
+    readonly NAS_DOM_FS=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f /etc/platform.conf)
 
     readonly AUTORUN_FILE=autorun.sh
     readonly AUTORUN_PATH=$DEF_VOLMP/.system/autorun
@@ -191,18 +189,18 @@ CreateProcessor()
 
     cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
 #!/usr/bin/env bash
+# https://github.com/OneCDOnly/create-autorun
 
-readonly AUTORUN_PATH=$AUTORUN_PATH
-readonly SCRIPT_STORE_PATH=$SCRIPT_STORE_PATH
 readonly LOGFILE=/var/log/autorun.log
+f=''
 
 echo "\$(date) -- autorun.sh is processing --" >> "\$LOGFILE"
 
-for i in \$SCRIPT_STORE_PATH/*; do
-    if [[ -x \$i ]]; then
+for f in $SCRIPT_STORE_PATH/*; do
+    if [[ -x \$f ]]; then
         echo -n "\$(date)" >> "\$LOGFILE"
-        echo " executing \$i ..." >> "\$LOGFILE"
-        \$i 2>&1 >> "\$LOGFILE"
+        echo " executing \$f ..." >> "\$LOGFILE"
+        \$f >> "\$LOGFILE" 2>&1
     fi
 done
 EOF
@@ -294,10 +292,7 @@ UnmountDOMPartition()
     {
 
     [[ $mount_flag = false ]] && return
-
-    local result_msg=''
-
-    result_msg=$(/bin/umount "$DOM_mount_point" 2>&1)
+    local result_msg=$(/bin/umount "$DOM_mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
         ShowAsDone "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
@@ -454,7 +449,7 @@ ColourReset()
 
     }
 
-Init || exit 1
+Init || exit
 
 FindDOMPartition
 CreateMountPoint
