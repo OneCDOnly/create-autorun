@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220122
+    local -r SCRIPT_VERSION=220122b
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -177,7 +177,7 @@ CreateScriptStore()
 
     [[ $exitcode -gt 0 ]] && return
 
-    mkdir -p "$SCRIPT_STORE_PATH" 2> /dev/null
+    mkdir -p "$SCRIPT_STORE_PATH" #2> /dev/null
 
     if [[ $? -eq 0 ]]; then
         ShowAsDone "created script store ($SCRIPT_STORE_PATH)"
