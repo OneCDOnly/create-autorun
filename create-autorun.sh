@@ -2,14 +2,9 @@
 ####################################################################################
 # create-autorun.sh
 #
-# Copyright (C) 2017-2021 OneCD [one.cd.only@gmail.com]
+# Copyright (C) 2017-2022 OneCD [one.cd.only@gmail.com]
 #
 # Create an autorun environment suited to this model QNAP NAS.
-#
-# Tested on:
-#  QTS 4.2.6 #20200821 running on a QNAP TS-559 Pro+
-#  QTS 4.4.1 #20191204 running on a QNAP TS-832X-8
-#  QTS 4.5.1 #20210107 running on a QNAP TS-230
 #
 # For more info: https://forum.qnap.com/viewtopic.php?f=45&t=130345
 #
@@ -33,11 +28,11 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=210130
+    local -r SCRIPT_VERSION=220122
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
-        ShowAsError "QTS functions missing (is this a QNAP NAS?): aborting ..."
+        ShowAsError "QNAP OS functions missing (is this a QNAP NAS?): aborting ..."
         return 1
     else
         . /etc/init.d/functions
@@ -46,9 +41,10 @@ Init()
     FindDefVol
 
     readonly NAS_ARC=$(</etc/default_config/BOOT.conf)
-    readonly NAS_DOM_NODE=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f /etc/platform.conf)
-    readonly NAS_DOM_PART=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f /etc/platform.conf)
-    readonly NAS_DOM_FS=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f /etc/platform.conf)
+    readonly NAS_DEV_NODE=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f /etc/platform.conf)
+    readonly NAS_AUTORUN_PART=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f /etc/platform.conf)
+    readonly NAS_AUTORUN_FS=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f /etc/platform.conf)
+    readonly NAS_SYSTEM_DEV=$(/sbin/getcfg System 'System Device' -f /etc/config/uLinux.conf)
 
     readonly AUTORUN_FILE=autorun.sh
     readonly AUTORUN_PATH=$DEF_VOLMP/.system/autorun
@@ -59,42 +55,47 @@ Init()
     echo "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)"
     echo
     ShowAsInfo "NAS model: $(get_display_name)"
-    ShowAsInfo "QTS version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
+    ShowAsInfo "Q$(grep -q zfs /proc/filesystems && echo 'u')TS version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
     ShowAsInfo "default volume: $DEF_VOLMP"
 
     exitcode=0
 
     }
 
-FindDOMPartition()
+FindAutorunPartition()
     {
 
     [[ $exitcode -gt 0 ]] && return
 
-    if [[ -n $NAS_DOM_NODE ]]; then
-        DOM_partition=${NAS_DOM_NODE}${NAS_DOM_PART}
+    if [[ -n $NAS_DEV_NODE ]]; then
+        autorun_partition=${NAS_DEV_NODE}${NAS_AUTORUN_PART}
     else
         if [[ -e /sbin/hal_app ]]; then
-            DOM_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
+            if grep -q zfs /proc/filesystems; then       # NAS is running QuTS
+                autorun_partition=$NAS_SYSTEM_DEV
+            else
+                autorun_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
+            fi
+
             case $(/sbin/getcfg 'System' 'Model') in
                 TS-X28A|TS-XA28A)
-                    DOM_partition+=5
+                    autorun_partition+=5
                     ;;
                 *)
-                    DOM_partition+=6
+                    autorun_partition+=6
                     ;;
             esac
         elif [[ $NAS_ARC = TS-NASARM ]]; then
-            DOM_partition=/dev/mtdblock5
+            autorun_partition=/dev/mtdblock5
         else
-            DOM_partition=/dev/sdx6
+            autorun_partition=/dev/sdx6
         fi
     fi
 
-    if [[ -n $DOM_partition ]]; then
-        ShowAsDone "DOM partition found ($DOM_partition)"
+    if [[ -n $autorun_partition ]]; then
+        ShowAsDone "found autorun partition ($autorun_partition)"
     else
-        ShowAsError 'unable to find the DOM partition!'
+        ShowAsError 'unable to find the autorun partition!'
         exitcode=2
     fi
 
@@ -105,16 +106,19 @@ CreateMountPoint()
 
     [[ $exitcode -gt 0 ]] && return
 
-    DOM_mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
+    mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
-    if [[ $? -ne 0 ]]; then
-        ShowAsError "unable to create a DOM mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
+
+    if [[ $? -eq 0 ]]; then
+        ShowAsDone "created mount-point ($mount_point)"
+    else
+        ShowAsError "unable to create a mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
         exitcode=3
     fi
 
     }
 
-MountDOMPartition()
+MountAutorunPartition()
     {
 
     [[ $exitcode -gt 0 ]] && return
@@ -122,11 +126,11 @@ MountDOMPartition()
     local mount_dev=''
     local result_msg=''
 
-    if [[ $NAS_DOM_FS = ubifs ]]; then
-        result_msg=$(/sbin/ubiattach -m "$NAS_DOM_PART" -d 2 2>&1)
+    if [[ $NAS_AUTORUN_FS = ubifs ]]; then
+        result_msg=$(/sbin/ubiattach -m "$NAS_AUTORUN_PART" -d 2 2>&1)
 
         if [[ $? -eq 0 ]]; then
-            ShowAsDone "ubiattached DOM partition ($NAS_DOM_PART)"
+            ShowAsDone "ubiattached autorun partition ($NAS_AUTORUN_PART)"
             mount_type=ubifs
             mount_dev=ubi2:config
         else
@@ -137,30 +141,32 @@ MountDOMPartition()
         fi
     else
         mount_type=ext2
-        mount_dev=$DOM_partition
+        mount_dev=$autorun_partition
     fi
 
-    result_msg=$(/bin/mount -t $mount_type $mount_dev "$DOM_mount_point" 2>&1)
+    result_msg=$(/bin/mount -t $mount_type $mount_dev "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "mounted ($mount_type) DOM partition at ($DOM_mount_point)"
+        ShowAsDone "mounted ($mount_type) autorun partition ($autorun_partition) at ($mount_point)"
         mount_flag=true
     else
-        ShowAsError "unable to mount ($mount_type) DOM partition ($mount_dev)! [$result_msg]"
+        ShowAsError "unable to mount ($mount_type) autorun partition ($autorun_partition) from ($mount_dev)! [$result_msg]"
         mount_flag=false
         exitcode=4
     fi
 
     }
 
-ConfirmDOMPartition()
+ConfirmAutorunPartition()
     {
 
     [[ $exitcode -gt 0 ]] && return
 
     # look for a known file
-    if [[ ! -e ${DOM_mount_point}/uLinux.conf ]]; then
-        ShowAsError 'DOM tag-file was not found!'
+    if [[ -e ${mount_point}/uLinux.conf ]]; then
+        ShowAsDone "found tag-file (${mount_point}/uLinux.conf) - we're in the right place"
+    else
+        ShowAsError "tag-file (${mount_point}/uLinux.conf) not found!"
         exitcode=6
     fi
 
@@ -173,7 +179,9 @@ CreateScriptStore()
 
     mkdir -p "$SCRIPT_STORE_PATH" 2> /dev/null
 
-    if [[ $? -ne 0 ]]; then
+    if [[ $? -eq 0 ]]; then
+        ShowAsDone "created script store ($SCRIPT_STORE_PATH)"
+    else
         ShowAsError "unable to create script store! ($SCRIPT_STORE_PATH)"
         exitcode=7
     fi
@@ -205,7 +213,9 @@ for f in $SCRIPT_STORE_PATH/*; do
 done
 EOF
 
-    if [[ $? -ne 0 ]]; then
+    if [[ $? -eq 0 ]]; then
+        ShowAsDone "created script processor ($AUTORUN_PROCESSOR_PATHFILE)"
+    else
         ShowAsError "unable to create script processor! ($AUTORUN_PROCESSOR_PATHFILE)"
         exitcode=8
         return
@@ -220,11 +230,12 @@ BackupExistingAutorun()
 
     [[ $exitcode -gt 0 ]] && return
 
-    DOM_LINKED_PATHFILE=$DOM_mount_point/$AUTORUN_FILE
+    LINKED_PATHFILE=$mount_point/$AUTORUN_FILE
 
-    if [[ -e $DOM_LINKED_PATHFILE && ! -L $DOM_LINKED_PATHFILE ]]; then
+    if [[ -e $LINKED_PATHFILE && ! -L $LINKED_PATHFILE ]]; then
         [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && Upshift "$AUTORUN_PROCESSOR_PATHFILE.prev"
-        mv "$DOM_LINKED_PATHFILE" "$AUTORUN_PROCESSOR_PATHFILE.prev"
+        mv "$LINKED_PATHFILE" "$AUTORUN_PROCESSOR_PATHFILE.prev"
+        ShowAsDone "backed-up previous ($AUTORUN_FILE) to ($AUTORUN_PROCESSOR_PATHFILE.prev)"
     fi
 
     }
@@ -279,30 +290,32 @@ AddLinkToStartup()
 
     [[ $exitcode -gt 0 ]] && return
 
-    ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$DOM_LINKED_PATHFILE"
+    ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$LINKED_PATHFILE"
 
-    if [[ $? -ne 0 ]]; then
+    if [[ $? -eq 0 ]]; then
+        ShowAsDone "created symlink from ($AUTORUN_PROCESSOR_PATHFILE) to ($LINKED_PATHFILE)"
+    else
         ShowAsError 'unable to create symlink!'
         exitcode=10
     fi
 
     }
 
-UnmountDOMPartition()
+UnmountAutorunPartition()
     {
 
     [[ $mount_flag = false ]] && return
-    local result_msg=$(/bin/umount "$DOM_mount_point" 2>&1)
+    local result_msg=$(/bin/umount "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "unmounted ($mount_type) DOM partition" "$DOM_mount_point"
+        ShowAsDone "unmounted ($mount_type) autorun partition" "$mount_point"
         mount_flag=false
     else
-        ShowAsError "unable to unmount ($mount_type) DOM partition! [$result_msg]"
+        ShowAsError "unable to unmount ($mount_type) autorun partition! [$result_msg]"
         exitcode=11
     fi
 
-    [[ $NAS_DOM_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_DOM_PART"
+    [[ $NAS_AUTORUN_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_AUTORUN_PART"
 
     }
 
@@ -310,7 +323,13 @@ RemoveMountPoint()
     {
 
     [[ $mount_flag = true ]] && return
-    [[ -e $DOM_mount_point ]] && rmdir "$DOM_mount_point"
+    [[ -e $mount_point ]] && rmdir "$mount_point"
+
+    if [[ $? -eq 0 ]]; then
+        ShowAsDone "removed mount-point ($mount_point)"
+    else
+        ShowAsError "unable to remove mount-point ($mount_point)"
+    fi
 
     }
 
@@ -318,10 +337,7 @@ ShowResult()
     {
 
     if [[ $exitcode -eq 0 ]]; then
-        ShowAsDone '(autorun.sh) successfully created!'
         ShowAsInfo "please place your startup scripts into ($SCRIPT_STORE_PATH)"
-    else
-        ShowAsError '(autorun.sh) creation failed!'
     fi
 
     }
@@ -451,15 +467,15 @@ ColourReset()
 
 Init || exit
 
-FindDOMPartition
+FindAutorunPartition
 CreateMountPoint
-MountDOMPartition
-ConfirmDOMPartition
+MountAutorunPartition
+ConfirmAutorunPartition
 CreateScriptStore
 CreateProcessor
 BackupExistingAutorun
 AddLinkToStartup
-UnmountDOMPartition
+UnmountAutorunPartition
 RemoveMountPoint
 ShowResult
 echo
