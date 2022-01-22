@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220122b
+    local -r SCRIPT_VERSION=220122c
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -36,6 +36,12 @@ Init()
         return 1
     else
         . /etc/init.d/functions
+    fi
+
+    if [[ $EUID -ne 0 ]]; then
+        ShowAsError "This script must be run with superuser privileges. Try again as:"
+        echo "curl -skL https://git.io/create-autorun | sudo bash"
+        return 1
     fi
 
     FindDefVol
@@ -177,7 +183,7 @@ CreateScriptStore()
 
     [[ $exitcode -gt 0 ]] && return
 
-    mkdir -p "$SCRIPT_STORE_PATH" #2> /dev/null
+    mkdir -p "$SCRIPT_STORE_PATH"
 
     if [[ $? -eq 0 ]]; then
         ShowAsDone "created script store ($SCRIPT_STORE_PATH)"
