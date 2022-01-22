@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220122c
+    local -r SCRIPT_VERSION=220122d
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -39,7 +39,7 @@ Init()
     fi
 
     if [[ $EUID -ne 0 ]]; then
-        ShowAsError "This script must be run with superuser privileges. Try again as:"
+        ShowAsError "this script must be run with superuser privileges. Try again as:"
         echo "curl -skL https://git.io/create-autorun | sudo bash"
         return 1
     fi
@@ -114,7 +114,6 @@ CreateMountPoint()
 
     mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
-
     if [[ $? -eq 0 ]]; then
         ShowAsDone "created mount-point ($mount_point)"
     else
@@ -183,9 +182,7 @@ CreateScriptStore()
 
     [[ $exitcode -gt 0 ]] && return
 
-    mkdir -p "$SCRIPT_STORE_PATH"
-
-    if [[ $? -eq 0 ]]; then
+    if mkdir -p "$SCRIPT_STORE_PATH"; then
         ShowAsDone "created script store ($SCRIPT_STORE_PATH)"
     else
         ShowAsError "unable to create script store! ($SCRIPT_STORE_PATH)"
@@ -236,7 +233,7 @@ BackupExistingAutorun()
 
     [[ $exitcode -gt 0 ]] && return
 
-    LINKED_PATHFILE=$mount_point/$AUTORUN_FILE
+    readonly LINKED_PATHFILE=$mount_point/$AUTORUN_FILE
 
     if [[ -e $LINKED_PATHFILE && ! -L $LINKED_PATHFILE ]]; then
         [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && Upshift "$AUTORUN_PROCESSOR_PATHFILE.prev"
@@ -296,9 +293,7 @@ AddLinkToStartup()
 
     [[ $exitcode -gt 0 ]] && return
 
-    ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$LINKED_PATHFILE"
-
-    if [[ $? -eq 0 ]]; then
+    if ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$LINKED_PATHFILE"; then
         ShowAsDone "created symlink from ($AUTORUN_PROCESSOR_PATHFILE) to ($LINKED_PATHFILE)"
     else
         ShowAsError 'unable to create symlink!'
@@ -329,9 +324,9 @@ RemoveMountPoint()
     {
 
     [[ $mount_flag = true ]] && return
-    [[ -e $mount_point ]] && rmdir "$mount_point"
+    [[ ! -e $mount_point ]] && return
 
-    if [[ $? -eq 0 ]]; then
+    if rmdir "$mount_point"; then
         ShowAsDone "removed mount-point ($mount_point)"
     else
         ShowAsError "unable to remove mount-point ($mount_point)"
