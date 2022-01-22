@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220122e
+    local -r SCRIPT_VERSION=220123
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -167,11 +167,13 @@ ConfirmAutorunPartition()
 
     [[ $exitcode -gt 0 ]] && return
 
-    # look for a known file
-    if [[ -e ${mount_point}/uLinux.conf ]]; then
-        ShowAsDone "found tag-file: ${mount_point}/uLinux.conf (we're in the right place)"
+    # look for a known file to confirm this is the autorun partition
+    local tag_pathfile=$mount_point/uLinux.conf
+
+    if [[ -e $tag_pathfile ]]; then
+        ShowAsDone "found tag-file: $tag_pathfile (we're in the right place)"
     else
-        ShowAsError "tag-file ${mount_point}/uLinux.conf not found!"
+        ShowAsError "tag-file $tag_pathfile not found!"
         exitcode=6
     fi
 
@@ -306,6 +308,7 @@ UnmountAutorunPartition()
     {
 
     [[ $mount_flag = false ]] && return
+
     local result_msg=$(/bin/umount "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
