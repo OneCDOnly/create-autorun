@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220122d
+    local -r SCRIPT_VERSION=220122e
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -99,7 +99,7 @@ FindAutorunPartition()
     fi
 
     if [[ -n $autorun_partition ]]; then
-        ShowAsDone "found autorun partition ($autorun_partition)"
+        ShowAsDone "found autorun partition: $autorun_partition"
     else
         ShowAsError 'unable to find the autorun partition!'
         exitcode=2
@@ -115,7 +115,7 @@ CreateMountPoint()
     mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "created mount-point ($mount_point)"
+        ShowAsDone "created mount-point: $mount_point"
     else
         ShowAsError "unable to create a mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
         exitcode=3
@@ -135,14 +135,14 @@ MountAutorunPartition()
         result_msg=$(/sbin/ubiattach -m "$NAS_AUTORUN_PART" -d 2 2>&1)
 
         if [[ $? -eq 0 ]]; then
-            ShowAsDone "ubiattached autorun partition ($NAS_AUTORUN_PART)"
+            ShowAsDone "ubiattached autorun partition: $NAS_AUTORUN_PART"
             mount_type=ubifs
             mount_dev=ubi2:config
         else
             ShowAsError "unable to ubiattach! [$result_msg]"
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
-            ShowAsInfo "will try as ($mount_type) instead"
+            ShowAsInfo "will try as $mount_type instead"
         fi
     else
         mount_type=ext2
@@ -152,10 +152,10 @@ MountAutorunPartition()
     result_msg=$(/bin/mount -t $mount_type $mount_dev "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "mounted ($mount_type) autorun partition ($autorun_partition) at ($mount_point)"
+        ShowAsDone "mounted $mount_type autorun partition $autorun_partition: $mount_point"
         mount_flag=true
     else
-        ShowAsError "unable to mount ($mount_type) autorun partition ($autorun_partition) from ($mount_dev)! [$result_msg]"
+        ShowAsError "unable to mount $mount_type autorun partition $autorun_partition from $mount_dev! [$result_msg]"
         mount_flag=false
         exitcode=4
     fi
@@ -169,9 +169,9 @@ ConfirmAutorunPartition()
 
     # look for a known file
     if [[ -e ${mount_point}/uLinux.conf ]]; then
-        ShowAsDone "found tag-file (${mount_point}/uLinux.conf) - we're in the right place"
+        ShowAsDone "found tag-file: ${mount_point}/uLinux.conf (we're in the right place)"
     else
-        ShowAsError "tag-file (${mount_point}/uLinux.conf) not found!"
+        ShowAsError "tag-file ${mount_point}/uLinux.conf not found!"
         exitcode=6
     fi
 
@@ -183,9 +183,9 @@ CreateScriptStore()
     [[ $exitcode -gt 0 ]] && return
 
     if mkdir -p "$SCRIPT_STORE_PATH"; then
-        ShowAsDone "created script store ($SCRIPT_STORE_PATH)"
+        ShowAsDone "created script store: $SCRIPT_STORE_PATH"
     else
-        ShowAsError "unable to create script store! ($SCRIPT_STORE_PATH)"
+        ShowAsError "unable to create script store! $SCRIPT_STORE_PATH"
         exitcode=7
     fi
 
@@ -217,9 +217,9 @@ done
 EOF
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "created script processor ($AUTORUN_PROCESSOR_PATHFILE)"
+        ShowAsDone "created script processor: $AUTORUN_PROCESSOR_PATHFILE"
     else
-        ShowAsError "unable to create script processor! ($AUTORUN_PROCESSOR_PATHFILE)"
+        ShowAsError "unable to create script processor! $AUTORUN_PROCESSOR_PATHFILE"
         exitcode=8
         return
     fi
@@ -238,7 +238,7 @@ BackupExistingAutorun()
     if [[ -e $LINKED_PATHFILE && ! -L $LINKED_PATHFILE ]]; then
         [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && Upshift "$AUTORUN_PROCESSOR_PATHFILE.prev"
         mv "$LINKED_PATHFILE" "$AUTORUN_PROCESSOR_PATHFILE.prev"
-        ShowAsDone "backed-up previous ($AUTORUN_FILE) to ($AUTORUN_PROCESSOR_PATHFILE.prev)"
+        ShowAsDone "backed-up previous $AUTORUN_FILE: $AUTORUN_PROCESSOR_PATHFILE.prev"
     fi
 
     }
@@ -294,7 +294,7 @@ AddLinkToStartup()
     [[ $exitcode -gt 0 ]] && return
 
     if ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$LINKED_PATHFILE"; then
-        ShowAsDone "created symlink from ($AUTORUN_PROCESSOR_PATHFILE) to ($LINKED_PATHFILE)"
+        ShowAsDone "created symlink: $AUTORUN_PROCESSOR_PATHFILE"
     else
         ShowAsError 'unable to create symlink!'
         exitcode=10
@@ -309,10 +309,10 @@ UnmountAutorunPartition()
     local result_msg=$(/bin/umount "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "unmounted ($mount_type) autorun partition" "$mount_point"
+        ShowAsDone "unmounted $mount_type autorun partition" "$mount_point"
         mount_flag=false
     else
-        ShowAsError "unable to unmount ($mount_type) autorun partition! [$result_msg]"
+        ShowAsError "unable to unmount $mount_type autorun partition! [$result_msg]"
         exitcode=11
     fi
 
@@ -327,9 +327,9 @@ RemoveMountPoint()
     [[ ! -e $mount_point ]] && return
 
     if rmdir "$mount_point"; then
-        ShowAsDone "removed mount-point ($mount_point)"
+        ShowAsDone "removed mount-point: $mount_point"
     else
-        ShowAsError "unable to remove mount-point ($mount_point)"
+        ShowAsError "unable to remove mount-point! $mount_point"
     fi
 
     }
@@ -338,7 +338,7 @@ ShowResult()
     {
 
     if [[ $exitcode -eq 0 ]]; then
-        ShowAsInfo "please place your startup scripts into ($SCRIPT_STORE_PATH)"
+        ShowAsInfo "please place your startup scripts into $SCRIPT_STORE_PATH"
     fi
 
     }
