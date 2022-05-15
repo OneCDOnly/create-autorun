@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220123
+    local -r SCRIPT_VERSION=220516
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -218,7 +218,7 @@ for f in $SCRIPT_STORE_PATH/*; do
 done
 EOF
 
-    if [[ $? -eq 0 ]]; then
+    if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
         ShowAsDone "created script processor: $AUTORUN_PROCESSOR_PATHFILE"
     else
         ShowAsError "unable to create script processor! $AUTORUN_PROCESSOR_PATHFILE"
@@ -266,7 +266,7 @@ Upshift()
     local rec_track_file=/tmp/${FUNCNAME[0]}.count
     [[ -e $rec_track_file ]] && rec_count=$(<"$rec_track_file")
     ((rec_count++)); [[ $rec_count -gt $rec_limit ]] && { echo "recursive limit reached!"; rm -f "$rec_track_file"; exit 1 ;}
-    echo $rec_count > "$rec_track_file"
+    echo "$rec_count" > "$rec_track_file"
 
     ext=${1##*.}
     case $ext in
@@ -309,13 +309,11 @@ UnmountAutorunPartition()
 
     [[ $mount_flag = false ]] && return
 
-    local result_msg=$(/bin/umount "$mount_point" 2>&1)
-
-    if [[ $? -eq 0 ]]; then
+    if /bin/umount "$mount_point"; then
         ShowAsDone "unmounted $mount_type autorun partition" "$mount_point"
         mount_flag=false
     else
-        ShowAsError "unable to unmount $mount_type autorun partition! [$result_msg]"
+        ShowAsError "unable to unmount $mount_type autorun partition!"
         exitcode=11
     fi
 
@@ -364,7 +362,8 @@ ShowAsError()
     {
 
     local buffer="$1"
-    local capitalised="$(tr "[a-z]" "[A-Z]" <<< "${buffer:0:1}")${buffer:1}"
+    local capitalised=''
+    capitalised="$(tr 'a-z' 'A-Z' <<< "${buffer:0:1}")${buffer:1}"
 
     WriteToDisplay.New "$(ColourTextBrightRed fail)" "$capitalised"
 
