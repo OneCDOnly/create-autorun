@@ -28,19 +28,19 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220516
+    local -r SCRIPT_VERSION=220524
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
-        ShowAsError "QNAP OS functions missing (is this a QNAP NAS?): aborting ..."
+        ShowAsError 'QNAP OS functions missing (is this a QNAP NAS?): aborting ...'
         return 1
     else
         . /etc/init.d/functions
     fi
 
     if [[ $EUID -ne 0 ]]; then
-        ShowAsError "this script must be run with superuser privileges. Try again as:"
-        echo "curl -skL https://git.io/create-autorun | sudo bash"
+        ShowAsError 'this script must be run with superuser privileges. Try again as:'
+        echo 'curl -skL https://git.io/create-autorun | sudo bash'
         return 1
     fi
 
@@ -304,6 +304,21 @@ AddLinkToStartup()
 
     }
 
+EnableAutorun()
+    {
+
+    [[ $exitcode -gt 0 ]] && return
+
+    local fwvers
+    fwvers=$(/sbin/getcfg System Version)
+
+    if [[ ${fwvers//.} -ge 430 ]]; then
+        /sbin/setcfg Misc Autorun TRUE
+        ShowAsDone 'enabled autorun.sh in QTS'
+    fi
+
+    }
+
 UnmountAutorunPartition()
     {
 
@@ -478,6 +493,7 @@ CreateScriptStore
 CreateProcessor
 BackupExistingAutorun
 AddLinkToStartup
+EnableAutorun
 UnmountAutorunPartition
 RemoveMountPoint
 ShowResult
