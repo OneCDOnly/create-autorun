@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220524
+    local -r SCRIPT_VERSION=220526
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -202,12 +202,12 @@ CreateProcessor()
 
     cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
 #!/usr/bin/env bash
-# https://github.com/OneCDOnly/create-autorun
+# source: https://github.com/OneCDOnly/create-autorun
 
 readonly LOGFILE=/var/log/autorun.log
 f=''
 
-echo "\$(date) -- autorun.sh is processing --" >> "\$LOGFILE"
+echo "\$(date) -- begin processing --" >> "\$LOGFILE"
 
 for f in $SCRIPT_STORE_PATH/*; do
     if [[ -x \$f ]]; then
@@ -216,6 +216,8 @@ for f in $SCRIPT_STORE_PATH/*; do
         \$f >> "\$LOGFILE" 2>&1
     fi
 done
+
+echo "\$(date) -- end processing --" >> "\$LOGFILE"
 EOF
 
     if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
