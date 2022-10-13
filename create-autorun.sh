@@ -84,7 +84,7 @@ FindAutorunPartition()
             fi
 
             case $(/sbin/getcfg 'System' 'Model') in
-                TS-X28A|TS-XA28A)
+                TS-X28A|TS-XA28A|TS-X33)
                     autorun_partition+=5
                     ;;
                 *)
