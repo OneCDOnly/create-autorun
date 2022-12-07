@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=220526
+    local -r SCRIPT_VERSION=221208
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
