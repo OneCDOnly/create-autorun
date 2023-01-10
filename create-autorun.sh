@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 ####################################################################################
 # create-autorun.sh
-#
-# Copyright (C) 2017-2022 OneCD [one.cd.only@gmail.com]
-#
+
+# Copyright (C) 2017-2023 OneCD [one.cd.only@gmail.com]
+
 # Create an autorun environment suited to this model QNAP NAS.
-#
+
 # For more info: https://forum.qnap.com/viewtopic.php?f=45&t=130345
-#
+
 # Project source: https://github.com/OneCDOnly/create-autorun
-#
+
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-#
+
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-#
+
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see http://www.gnu.org/licenses/.
 ####################################################################################
@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=221208
+    local -r SCRIPT_VERSION=230110
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -89,7 +89,6 @@ FindAutorunPartition()
                     ;;
                 *)
                     autorun_partition+=6
-                    ;;
             esac
         elif [[ $NAS_ARC = TS-NASARM ]]; then
             autorun_partition=/dev/mtdblock5
@@ -99,11 +98,12 @@ FindAutorunPartition()
     fi
 
     if [[ -n $autorun_partition ]]; then
-        ShowAsDone "found autorun partition: $autorun_partition"
-    else
-        ShowAsError 'unable to find the autorun partition!'
-        exitcode=2
+        ShowAsInfo "autorun partition: $autorun_partition"
+        return
     fi
+
+    ShowAsError 'unable to find the autorun partition!'
+    exitcode=2
 
     }
 
@@ -116,10 +116,11 @@ CreateMountPoint()
 
     if [[ $? -eq 0 ]]; then
         ShowAsDone "created mount-point: $mount_point"
-    else
-        ShowAsError "unable to create a mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
-        exitcode=3
+        return
     fi
+
+    ShowAsError "unable to create a mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
+    exitcode=3
 
     }
 
@@ -154,11 +155,12 @@ MountAutorunPartition()
     if [[ $? -eq 0 ]]; then
         ShowAsDone "mounted $mount_type autorun partition $autorun_partition: $mount_point"
         mount_flag=true
-    else
-        ShowAsError "unable to mount $mount_type autorun partition $autorun_partition from $mount_dev! [$result_msg]"
-        mount_flag=false
-        exitcode=4
+        return
     fi
+
+    ShowAsError "unable to mount $mount_type autorun partition $autorun_partition from $mount_dev! [$result_msg]"
+    mount_flag=false
+    exitcode=4
 
     }
 
@@ -167,15 +169,20 @@ ConfirmAutorunPartition()
 
     [[ $exitcode -gt 0 ]] && return
 
-    # look for a known file to confirm this is the autorun partition
-    local tag_pathfile=$mount_point/uLinux.conf
+    # Look for a known file to confirm this is the autorun partition.
+    # Include an alternative file to confirm this is the autorun partition on QuTS. https://github.com/OneCDOnly/create-autorun/issues/10
 
-    if [[ -e $tag_pathfile ]]; then
-        ShowAsDone "found tag-file: $tag_pathfile (we're in the right place)"
-    else
-        ShowAsError "tag-file $tag_pathfile not found!"
-        exitcode=6
-    fi
+    local tag_file=''
+
+    for tag_file in uLinux.conf .sys_update_time; do
+        if [[ -e $mount_point/$tag_file ]]; then
+            ShowAsInfo "found tag-file: $tag_file $(ColourTextBrightGreen "(we're in the right place)")"
+            return 0
+        fi
+    done
+
+    ShowAsError 'tag-file not found!'
+    exitcode=6
 
     }
 
@@ -186,10 +193,11 @@ CreateScriptStore()
 
     if mkdir -p "$SCRIPT_STORE_PATH"; then
         ShowAsDone "created script store: $SCRIPT_STORE_PATH"
-    else
-        ShowAsError "unable to create script store! $SCRIPT_STORE_PATH"
-        exitcode=7
+        return 0
     fi
+
+    ShowAsError "unable to create script store! $SCRIPT_STORE_PATH"
+    exitcode=7
 
     }
 
@@ -199,6 +207,11 @@ CreateProcessor()
     [[ $exitcode -gt 0 ]] && return
 
     # write the script directory processor to disk.
+
+    if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
+        ShowAsInfo "script processor already exists: $AUTORUN_PROCESSOR_PATHFILE"
+        return
+    fi
 
     cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
 #!/usr/bin/env bash
@@ -222,13 +235,12 @@ EOF
 
     if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
         ShowAsDone "created script processor: $AUTORUN_PROCESSOR_PATHFILE"
-    else
-        ShowAsError "unable to create script processor! $AUTORUN_PROCESSOR_PATHFILE"
-        exitcode=8
+        chmod +x "$AUTORUN_PROCESSOR_PATHFILE"
         return
     fi
 
-    chmod +x "$AUTORUN_PROCESSOR_PATHFILE"
+    ShowAsError "unable to create script processor! $AUTORUN_PROCESSOR_PATHFILE"
+    exitcode=8
 
     }
 
@@ -267,7 +279,7 @@ Upshift()
     local rec_count=0
     local rec_track_file=/tmp/${FUNCNAME[0]}.count
     [[ -e $rec_track_file ]] && rec_count=$(<"$rec_track_file")
-    ((rec_count++)); [[ $rec_count -gt $rec_limit ]] && { echo "recursive limit reached!"; rm -f "$rec_track_file"; exit 1 ;}
+    ((rec_count++)); [[ $rec_count -gt $rec_limit ]] && { echo 'recursive limit reached!'; rm -f "$rec_track_file"; exit 1 ;}
     echo "$rec_count" > "$rec_track_file"
 
     ext=${1##*.}
@@ -285,7 +297,6 @@ Upshift()
             else
                 rm "$1"
             fi
-            ;;
     esac
 
     [[ -e $rec_track_file ]] && { rec_count=$(<"$rec_track_file"); ((rec_count--)); echo "$rec_count" > "$rec_track_file" ;}
@@ -299,10 +310,11 @@ AddLinkToStartup()
 
     if ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$LINKED_PATHFILE"; then
         ShowAsDone "created symlink: $AUTORUN_PROCESSOR_PATHFILE"
-    else
-        ShowAsError 'unable to create symlink!'
-        exitcode=10
+        return
     fi
+
+    ShowAsError 'unable to create symlink!'
+    exitcode=10
 
     }
 
@@ -316,7 +328,7 @@ EnableAutorun()
 
     if [[ ${fwvers//.} -ge 430 ]]; then
         /sbin/setcfg Misc Autorun TRUE
-        ShowAsDone 'enabled autorun.sh in QTS'
+        ShowAsDone 'enabled autorun.sh in OS'
     fi
 
     }
@@ -345,10 +357,11 @@ RemoveMountPoint()
     [[ ! -e $mount_point ]] && return
 
     if rmdir "$mount_point"; then
-        ShowAsDone "removed mount-point: $mount_point"
-    else
-        ShowAsError "unable to remove mount-point! $mount_point"
+        ShowAsDone 'removed mount-point'
+        return
     fi
+
+    ShowAsError "unable to remove mount-point! $mount_point"
 
     }
 
@@ -420,7 +433,6 @@ WriteToDisplay.New()
     local new_message=''
     local strbuffer=''
     local new_length=0
-
     new_message=$(printf "%-10s: %s" "$1" "$2")
 
     if [[ $new_message != "$previous_msg" ]]; then
