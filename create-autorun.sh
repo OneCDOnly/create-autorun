@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230110
+    local -r SCRIPT_VERSION=230113
 
     # include QNAP functions
     if [[ ! -e /etc/init.d/functions ]]; then
@@ -61,9 +61,11 @@ Init()
     echo "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)"
     echo
     ShowAsInfo "NAS model: $(get_display_name)"
-    ShowAsInfo "Q$(grep -q zfs /proc/filesystems && echo 'u')TS version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
+    ShowAsInfo "Q$(/bin/grep -q zfs /proc/filesystems && echo 'u')TS version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
     ShowAsInfo "default volume: $DEF_VOLMP"
 
+    partition_mounted=false
+    script_store_created=false
     exitcode=0
 
     }
@@ -71,19 +73,19 @@ Init()
 FindAutorunPartition()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
     if [[ -n $NAS_DEV_NODE ]]; then
         autorun_partition=${NAS_DEV_NODE}${NAS_AUTORUN_PART}
     else
         if [[ -e /sbin/hal_app ]]; then
-            if grep -q zfs /proc/filesystems; then       # NAS is running QuTS
+            if /bin/grep -q zfs /proc/filesystems; then       # NAS is running QuTS
                 autorun_partition=$NAS_SYSTEM_DEV
             else
                 autorun_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
             fi
 
-            case $(/sbin/getcfg 'System' 'Model') in
+            case $(/sbin/getcfg System Model) in
                 TS-X28A|TS-XA28A|TS-X33|TS-X35EU)
                     autorun_partition+=5
                     ;;
@@ -103,31 +105,31 @@ FindAutorunPartition()
     fi
 
     ShowAsError 'unable to find the autorun partition!'
-    exitcode=2
+    exitcode=1
 
     }
 
 CreateMountPoint()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
-    mount_point=$(mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
+    mount_point=$(/bin/mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "created mount-point: $mount_point"
+        ShowAsDone "created temporary mount-point: $mount_point"
         return
     fi
 
-    ShowAsError "unable to create a mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
-    exitcode=3
+    ShowAsError "unable to create a temporary mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
+    exitcode=2
 
     }
 
 MountAutorunPartition()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
     local mount_dev=''
     local result_msg=''
@@ -153,21 +155,21 @@ MountAutorunPartition()
     result_msg=$(/bin/mount -t $mount_type $mount_dev "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "mounted $mount_type autorun partition $autorun_partition: $mount_point"
-        mount_flag=true
+        ShowAsDone "mounted $mount_type autorun partition $autorun_partition -> $mount_point"
+        partition_mounted=true
         return
     fi
 
     ShowAsError "unable to mount $mount_type autorun partition $autorun_partition from $mount_dev! [$result_msg]"
-    mount_flag=false
-    exitcode=4
+    partition_mounted=false
+    exitcode=3
 
     }
 
 ConfirmAutorunPartition()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
     # Look for a known file to confirm this is the autorun partition.
     # Include an alternative file to confirm this is the autorun partition on QuTS. https://github.com/OneCDOnly/create-autorun/issues/10
@@ -176,42 +178,29 @@ ConfirmAutorunPartition()
 
     for tag_file in uLinux.conf .sys_update_time; do
         if [[ -e $mount_point/$tag_file ]]; then
-            ShowAsInfo "found tag-file: $tag_file $(ColourTextBrightGreen "(we're in the right place)")"
+            ShowAsInfo "confirmed partition tag-file exists: $tag_file $(ColourTextBrightGreen "(we're in the right place)")"
             return 0
         fi
     done
 
-    ShowAsError 'tag-file not found!'
-    exitcode=6
-
-    }
-
-CreateScriptStore()
-    {
-
-    [[ $exitcode -gt 0 ]] && return
-
-    if mkdir -p "$SCRIPT_STORE_PATH"; then
-        ShowAsDone "created script store: $SCRIPT_STORE_PATH"
-        return 0
-    fi
-
-    ShowAsError "unable to create script store! $SCRIPT_STORE_PATH"
-    exitcode=7
+    ShowAsError 'partition tag-file not found!'
+    exitcode=4
 
     }
 
 CreateProcessor()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
-    # write the script directory processor to disk.
+    [[ ! -d $AUTORUN_PATH ]] && mkdir -p "$AUTORUN_PATH"
 
     if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
-        ShowAsInfo "script processor already exists: $AUTORUN_PROCESSOR_PATHFILE"
+        ShowAsInfo "$AUTORUN_FILE already exists: $AUTORUN_PROCESSOR_PATHFILE"
         return
     fi
+
+    # write a new script directory processor to disk
 
     cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
 #!/usr/bin/env bash
@@ -234,101 +223,67 @@ echo "\$(date) -- end processing --" >> "\$LOGFILE"
 EOF
 
     if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
-        ShowAsDone "created script processor: $AUTORUN_PROCESSOR_PATHFILE"
+        ShowAsDone "created autorun script processor: $AUTORUN_PROCESSOR_PATHFILE"
         chmod +x "$AUTORUN_PROCESSOR_PATHFILE"
+        CreateScriptStore
         return
     fi
 
-    ShowAsError "unable to create script processor! $AUTORUN_PROCESSOR_PATHFILE"
-    exitcode=8
+    ShowAsError "unable to create autorun script processor! $AUTORUN_PROCESSOR_PATHFILE"
+    exitcode=5
 
     }
 
-BackupExistingAutorun()
+CreateScriptStore()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
-    readonly LINKED_PATHFILE=$mount_point/$AUTORUN_FILE
-
-    if [[ -e $LINKED_PATHFILE && ! -L $LINKED_PATHFILE ]]; then
-        [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && Upshift "$AUTORUN_PROCESSOR_PATHFILE.prev"
-        mv "$LINKED_PATHFILE" "$AUTORUN_PROCESSOR_PATHFILE.prev"
-        ShowAsDone "backed-up previous $AUTORUN_FILE: $AUTORUN_PROCESSOR_PATHFILE.prev"
+    if mkdir -p "$SCRIPT_STORE_PATH"; then
+        ShowAsDone "created script store: $SCRIPT_STORE_PATH"
+        script_store_created=true
+        return 0
     fi
 
-    }
-
-Upshift()
-    {
-
-    # move specified existing filename by incrementing extension value (upshift extension)
-    # if extension is not a number, then create new extension of '1' and copy file
-
-    # $1 = pathfilename to upshift
-
-    [[ -z $1 ]] && return 1
-    [[ ! -e $1 ]] && return 1
-
-    local ext=''
-    local dest=''
-    local rotate_limit=10
-
-    # keep count of recursive calls
-    local rec_limit=$((rotate_limit*2))
-    local rec_count=0
-    local rec_track_file=/tmp/${FUNCNAME[0]}.count
-    [[ -e $rec_track_file ]] && rec_count=$(<"$rec_track_file")
-    ((rec_count++)); [[ $rec_count -gt $rec_limit ]] && { echo 'recursive limit reached!'; rm -f "$rec_track_file"; exit 1 ;}
-    echo "$rec_count" > "$rec_track_file"
-
-    ext=${1##*.}
-    case $ext in
-        *[!0-9]*)   # specified file extension is not a number so add number and copy it
-            dest="$1.1"
-            [[ -e $dest ]] && Upshift "$dest"
-            cp "$1" "$dest"
-            ;;
-        *)          # extension IS a number, so move it if possible
-            if [[ $ext -lt $((rotate_limit-1)) ]]; then
-                ((ext++)); dest="${1%.*}.$ext"
-                [[ -e $dest ]] && Upshift "$dest"
-                mv "$1" "$dest"
-            else
-                rm "$1"
-            fi
-    esac
-
-    [[ -e $rec_track_file ]] && { rec_count=$(<"$rec_track_file"); ((rec_count--)); echo "$rec_count" > "$rec_track_file" ;}
+    ShowAsError "unable to create script store! $SCRIPT_STORE_PATH"
+    exitcode=6
 
     }
 
-AddLinkToStartup()
+AddLinkFromAutorunPartition()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
-    if ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$LINKED_PATHFILE"; then
-        ShowAsDone "created symlink: $AUTORUN_PROCESSOR_PATHFILE"
+    if [[ ! -L "$mount_point/$AUTORUN_FILE" ]]; then
+        if ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
+            ShowAsDone "created symlink from partition to $AUTORUN_FILE"
+            return
+        fi
+    else
+        ShowAsInfo "symlink from partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
         return
     fi
 
     ShowAsError 'unable to create symlink!'
-    exitcode=10
+    exitcode=7
 
     }
 
 EnableAutorun()
     {
 
-    [[ $exitcode -gt 0 ]] && return
+    [[ $exitcode -eq 0 ]] || return
 
-    local fwvers
-    fwvers=$(/sbin/getcfg System Version)
+    local fwvers=$(/sbin/getcfg System Version)
 
     if [[ ${fwvers//.} -ge 430 ]]; then
-        /sbin/setcfg Misc Autorun TRUE
-        ShowAsDone 'enabled autorun.sh in OS'
+        if [[ $(/sbin/getcfg Misc Autorun) != TRUE ]]; then
+            /sbin/setcfg Misc Autorun TRUE
+            ShowAsDone 'enabled autorun.sh in OS'
+        else
+            ShowAsInfo 'autorun.sh is already enabled in OS'
+        fi
     fi
 
     }
@@ -336,14 +291,14 @@ EnableAutorun()
 UnmountAutorunPartition()
     {
 
-    [[ $mount_flag = false ]] && return
+    [[ $partition_mounted = false ]] && return
 
     if /bin/umount "$mount_point"; then
         ShowAsDone "unmounted $mount_type autorun partition" "$mount_point"
-        mount_flag=false
+        partition_mounted=false
     else
         ShowAsError "unable to unmount $mount_type autorun partition!"
-        exitcode=11
+        exitcode=8
     fi
 
     [[ $NAS_AUTORUN_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_AUTORUN_PART"
@@ -353,24 +308,25 @@ UnmountAutorunPartition()
 RemoveMountPoint()
     {
 
-    [[ $mount_flag = true ]] && return
+    [[ $partition_mounted = true ]] && return
     [[ ! -e $mount_point ]] && return
 
     if rmdir "$mount_point"; then
-        ShowAsDone 'removed mount-point'
+        ShowAsDone 'removed temporary mount-point'
         return
     fi
 
-    ShowAsError "unable to remove mount-point! $mount_point"
+    ShowAsError "unable to remove temporary mount-point! $mount_point"
 
     }
 
 ShowResult()
     {
 
-    if [[ $exitcode -eq 0 ]]; then
-        ShowAsInfo "please place your startup scripts into $SCRIPT_STORE_PATH"
-    fi
+    [[ $exitcode -eq 0 ]] || return
+    echo
+    [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into $SCRIPT_STORE_PATH"
+    [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at $AUTORUN_PROCESSOR_PATHFILE"
 
     }
 
@@ -498,15 +454,12 @@ ColourReset()
     }
 
 Init || exit
-
 FindAutorunPartition
 CreateMountPoint
 MountAutorunPartition
 ConfirmAutorunPartition
-CreateScriptStore
 CreateProcessor
-BackupExistingAutorun
-AddLinkToStartup
+AddLinkFromAutorunPartition
 EnableAutorun
 UnmountAutorunPartition
 RemoveMountPoint
