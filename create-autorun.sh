@@ -70,7 +70,7 @@ Init()
 
     }
 
-CalcAutorunPartition()
+DetermineAutorunPartitionLocation()
     {
 
     [[ $exitcode -eq 0 ]] || return
@@ -100,11 +100,11 @@ CalcAutorunPartition()
     fi
 
     if [[ -n $autorun_partition ]]; then
-        ShowAsInfo "autorun partition: $autorun_partition"
+        ShowAsInfo "determined autorun partition to be: $autorun_partition"
         return
     fi
 
-    ShowAsError 'unable to calculate the autorun partition!'
+    ShowAsError 'unable to determine the autorun partition location!'
     exitcode=1
 
     }
@@ -446,7 +446,7 @@ ColourReset()
     }
 
 Init || exit
-CalcAutorunPartition
+DetermineAutorunPartitionLocation
 CreateMountPoint
 MountAutorunPartition
 ConfirmAutorunPartition
