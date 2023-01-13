@@ -326,8 +326,8 @@ ShowResult()
 
     [[ $exitcode -eq 0 ]] || return
     echo
-    [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into $SCRIPT_STORE_PATH"
-    [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at $AUTORUN_PROCESSOR_PATHFILE"
+    [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into: $SCRIPT_STORE_PATH"
+    [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at: $AUTORUN_PROCESSOR_PATHFILE"
 
     }
 
