@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230113
+    local -r SCRIPT_VERSION=230114
 
     # include QNAP functions
     if [[ -e /etc/init.d/functions ]]; then
@@ -61,7 +61,7 @@ Init()
     echo "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)"
     echo
     ShowAsInfo "NAS model: $(get_display_name)"
-    ShowAsInfo "Q$(/bin/grep -q zfs /proc/filesystems && echo 'u')TS version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
+    ShowAsInfo "$(GetQnapOS) version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
     ShowAsInfo "default volume: $DEF_VOLMP"
 
     partition_mounted=false
@@ -100,11 +100,11 @@ DetermineAutorunPartitionLocation()
     fi
 
     if [[ -n $autorun_partition ]]; then
-        ShowAsInfo "determined autorun partition to be: $autorun_partition"
+        ShowAsInfo "autorun partition should be: $autorun_partition"
         return
     fi
 
-    ShowAsError 'unable to determine the autorun partition location!'
+    ShowAsError 'unable to determine the autorun partition location'
     exitcode=1
 
     }
@@ -121,7 +121,7 @@ CreateMountPoint()
         return
     fi
 
-    ShowAsError "unable to create a temporary mount-point! ($MOUNT_BASE_PATH.XXXXXX)"
+    ShowAsError "unable to create a temporary mount-point ($MOUNT_BASE_PATH.XXXXXX)"
     exitcode=2
 
     }
@@ -142,7 +142,7 @@ MountAutorunPartition()
             mount_type=ubifs
             mount_dev=ubi2:config
         else
-            ShowAsError "unable to ubiattach! [$result_msg]"
+            ShowAsSkip "unable to ubiattach '$result_msg'"
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
             ShowAsInfo "will try as $mount_type instead"
@@ -155,12 +155,12 @@ MountAutorunPartition()
     result_msg=$(/bin/mount -t $mount_type $mount_dev "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "mounted $mount_type autorun partition $autorun_partition -> $mount_point"
+        ShowAsDone "mounted $mount_type autorun partition: $autorun_partition -> $mount_point"
         partition_mounted=true
         return
     fi
 
-    ShowAsError "unable to mount $mount_type autorun partition $autorun_partition from $mount_dev! [$result_msg]"
+    ShowAsError "unable to mount $mount_type autorun partition: $autorun_partition '$result_msg'"
     partition_mounted=false
     exitcode=3
 
@@ -183,7 +183,7 @@ ConfirmAutorunPartition()
         fi
     done
 
-    ShowAsError 'partition tag-file not found!'
+    ShowAsError 'partition tag-file not found'
     exitcode=4
 
     }
@@ -196,7 +196,7 @@ CreateProcessor()
     [[ ! -d $AUTORUN_PATH ]] && mkdir -p "$AUTORUN_PATH"
 
     if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
-        ShowAsInfo "$AUTORUN_FILE already exists: $AUTORUN_PROCESSOR_PATHFILE"
+        ShowAsSkip "$AUTORUN_FILE already exists: $AUTORUN_PROCESSOR_PATHFILE"
         return
     fi
 
@@ -229,7 +229,7 @@ EOF
         return
     fi
 
-    ShowAsError "unable to create autorun script processor! $AUTORUN_PROCESSOR_PATHFILE"
+    ShowAsError "unable to create autorun script processor $AUTORUN_PROCESSOR_PATHFILE"
     exitcode=5
 
     }
@@ -245,7 +245,7 @@ CreateScriptStore()
         return 0
     fi
 
-    ShowAsError "unable to create script store! $SCRIPT_STORE_PATH"
+    ShowAsError "unable to create script store $SCRIPT_STORE_PATH"
     exitcode=6
 
     }
@@ -261,11 +261,11 @@ AddLinkFromAutorunPartition()
             return
         fi
     else
-        ShowAsInfo "symlink from partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
+        ShowAsSkip "symlink from partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
         return
     fi
 
-    ShowAsError 'unable to create symlink!'
+    ShowAsError 'unable to create symlink'
     exitcode=7
 
     }
@@ -282,7 +282,7 @@ EnableAutorun()
             /sbin/setcfg Misc Autorun TRUE
             ShowAsDone 'enabled autorun.sh in OS'
         else
-            ShowAsInfo 'autorun.sh is already enabled in OS'
+            ShowAsSkip 'autorun.sh is already enabled in OS'
         fi
     fi
 
@@ -297,7 +297,7 @@ UnmountAutorunPartition()
         ShowAsDone "unmounted $mount_type autorun partition" "$mount_point"
         partition_mounted=false
     else
-        ShowAsError "unable to unmount $mount_type autorun partition!"
+        ShowAsError "unable to unmount $mount_type autorun partition"
         exitcode=8
     fi
 
@@ -316,7 +316,7 @@ RemoveMountPoint()
         return
     fi
 
-    ShowAsError "unable to remove temporary mount-point! $mount_point"
+    ShowAsError "unable to remove temporary mount-point: $mount_point"
     exitcode=9
 
     }
@@ -335,6 +335,13 @@ ShowAsInfo()
     {
 
     WriteToDisplay.New "$(ColourTextBrightYellow info)" "${1:-}"
+
+    }
+
+ShowAsSkip()
+    {
+
+    WriteToDisplay.New "$(ColourTextBrightOrange skip)" "${1:-}"
 
     }
 
@@ -410,6 +417,17 @@ WriteToDisplay.New()
 
     }
 
+GetQnapOS()
+    {
+
+    if /bin/grep -q zfs /proc/filesystems; then
+        echo 'QuTS hero'
+    else
+        echo QTS
+    fi
+
+    }
+
 ColourTextBrightGreen()
     {
 
@@ -421,6 +439,13 @@ ColourTextBrightYellow()
     {
 
     echo -en '\033[1;33m'"$(ColourReset "${1:-}")"
+
+    }
+
+ColourTextBrightOrange()
+    {
+
+    echo -en '\033[1;38;5;214m'"$(ColourReset "${1:-}")"
 
     }
 
