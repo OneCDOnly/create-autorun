@@ -15,7 +15,7 @@ This installer script writes an `autorun.sh` processor into your default volume,
 
 ## Notes
 
-- If you didn't have an `autorun.sh` file before, then the `autorun.sh` file created by this utility will contain a script directory processor, and make a a scripts directory available for your own shell-scripts. Everything in this scripts directory is run (in-order) during NAS startup by the default `autorun.sh` file created only. The notes below are only applicable to the `autorun.sh` written by this utility. If you already had another `autorun.sh` file, then it will remain and be used instead, and the following notes won't apply.
+- If you didn't have an `autorun.sh` file before, then the `autorun.sh` file created by this utility will contain a script directory processor, and make a scripts directory available for your own shell-scripts. Everything in this scripts directory is run (in-order) during NAS startup by the default `autorun.sh` file created only. The notes below are only applicable to the `autorun.sh` written by this utility. If you already had another `autorun.sh` file, then it will remain and be used instead, and the following notes won't apply.
 
 - The location of the autorun system will depend on your default volume name. For example: if your default volume is `CACHEDEV1_DATA`, then the automatic script processor will be created at:
 ```
