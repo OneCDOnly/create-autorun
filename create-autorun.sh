@@ -31,11 +31,11 @@ Init()
     local -r SCRIPT_VERSION=230113
 
     # include QNAP functions
-    if [[ ! -e /etc/init.d/functions ]]; then
+    if [[ -e /etc/init.d/functions ]]; then
+        . /etc/init.d/functions
+    else
         ShowAsError 'QNAP OS functions missing (is this a QNAP NAS?): aborting ...'
         return 1
-    else
-        . /etc/init.d/functions
     fi
 
     if [[ $EUID -ne 0 ]]; then
@@ -70,7 +70,7 @@ Init()
 
     }
 
-FindAutorunPartition()
+CalcAutorunPartition()
     {
 
     [[ $exitcode -eq 0 ]] || return
@@ -104,7 +104,7 @@ FindAutorunPartition()
         return
     fi
 
-    ShowAsError 'unable to find the autorun partition!'
+    ShowAsError 'unable to calculate the autorun partition!'
     exitcode=1
 
     }
@@ -291,7 +291,7 @@ EnableAutorun()
 UnmountAutorunPartition()
     {
 
-    [[ $partition_mounted = false ]] && return
+    [[ $partition_mounted = true ]] || return
 
     if /bin/umount "$mount_point"; then
         ShowAsDone "unmounted $mount_type autorun partition" "$mount_point"
@@ -308,8 +308,8 @@ UnmountAutorunPartition()
 RemoveMountPoint()
     {
 
-    [[ $partition_mounted = true ]] && return
-    [[ ! -e $mount_point ]] && return
+    [[ $partition_mounted = false ]] || return
+    [[ -e $mount_point ]] || return
 
     if rmdir "$mount_point"; then
         ShowAsDone 'removed temporary mount-point'
@@ -317,6 +317,7 @@ RemoveMountPoint()
     fi
 
     ShowAsError "unable to remove temporary mount-point! $mount_point"
+    exitcode=9
 
     }
 
@@ -333,25 +334,23 @@ ShowResult()
 ShowAsInfo()
     {
 
-    WriteToDisplay.New "$(ColourTextBrightYellow info)" "$1"
+    WriteToDisplay.New "$(ColourTextBrightYellow info)" "${1:-}"
 
     }
 
 ShowAsDone()
     {
 
-    WriteToDisplay.New "$(ColourTextBrightGreen 'done')" "$1"
+    WriteToDisplay.New "$(ColourTextBrightGreen 'done')" "${1:-}"
 
     }
 
 ShowAsError()
     {
 
-    local buffer="$1"
-    local capitalised=''
-    capitalised="$(tr 'a-z' 'A-Z' <<< "${buffer:0:1}")${buffer:1}"
+    local buffer="${1:-}"
 
-    WriteToDisplay.New "$(ColourTextBrightRed fail)" "$capitalised"
+    WriteToDisplay.New "$(ColourTextBrightRed fail)" "$(tr 'a-z' 'A-Z' <<< "${buffer:0:1}")${buffer:1}"
 
     }
 
@@ -364,7 +363,7 @@ WriteToDisplay.Wait()
     #   $1 = pass/fail
     #   $2 = message
 
-    previous_msg=$(printf "%-10s: %s" "$1" "$2")
+    previous_msg=$(printf "%-10s: %s" "${1:-}" "${2:-}")
 
     echo -n "$previous_msg"
 
@@ -414,40 +413,40 @@ WriteToDisplay.New()
 ColourTextBrightGreen()
     {
 
-    echo -en '\033[1;32m'"$(ColourReset "$1")"
+    echo -en '\033[1;32m'"$(ColourReset "${1:-}")"
 
     }
 
 ColourTextBrightYellow()
     {
 
-    echo -en '\033[1;33m'"$(ColourReset "$1")"
+    echo -en '\033[1;33m'"$(ColourReset "${1:-}")"
 
     }
 
 ColourTextBrightRed()
     {
 
-    echo -en '\033[1;31m'"$(ColourReset "$1")"
+    echo -en '\033[1;31m'"$(ColourReset "${1:-}")"
 
     }
 
 ColourTextBrightWhite()
     {
 
-    echo -en '\033[1;97m'"$(ColourReset "$1")"
+    echo -en '\033[1;97m'"$(ColourReset "${1:-}")"
 
     }
 
 ColourReset()
     {
 
-    echo -en "$1"'\033[0m'
+    echo -en "${1:-}"'\033[0m'
 
     }
 
 Init || exit
-FindAutorunPartition
+CalcAutorunPartition
 CreateMountPoint
 MountAutorunPartition
 ConfirmAutorunPartition
