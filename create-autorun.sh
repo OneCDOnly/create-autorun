@@ -200,7 +200,7 @@ CreateProcessor()
         return
     fi
 
-    # write a new script directory processor to disk
+    # write a new scripts directory processor to disk
 
     cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
 #!/usr/bin/env bash
@@ -358,7 +358,7 @@ ShowAsError()
 WriteToDisplay.Wait()
     {
 
-    # Writes a new message without newline (unless in debug mode)
+    # Write a new message without newline
 
     # input:
     #   $1 = pass/fail
@@ -375,7 +375,7 @@ WriteToDisplay.Wait()
 WriteToDisplay.New()
     {
 
-    # Updates the previous message
+    # Update the previous message
 
     # input:
     #   $1 = pass/fail
@@ -422,13 +422,6 @@ ColourTextBrightYellow()
     {
 
     echo -en '\033[1;33m'"$(ColourReset "$1")"
-
-    }
-
-ColourTextBrightOrange()
-    {
-
-    echo -en '\033[1;38;5;214m'"$(ColourReset "$1")"
 
     }
 
