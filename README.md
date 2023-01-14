@@ -4,6 +4,8 @@
 
 This is a run-once BASH script to create an autorun environment on your QNAP NAS. This can be used to automatically execute your own scripts when the NAS boots-up.
 
+The aim of this project is to support **all** QNAP NAS models and **all** QTS & QuTS hero versions. Please advise if you encounter any errors when running it on your NAS.
+
 
 ## What it does
 
@@ -11,7 +13,6 @@ This installer script writes an `autorun.sh` processor into your default volume,
 
 The autorun device and partition are automatically determined by this script.
 
-The aim of this project is to support **all** QNAP NAS models and **all** QTS & QuTS hero versions. Please advise if you encounter any errors when running it on your NAS.
 
 ## How to create your autorun.sh
 
