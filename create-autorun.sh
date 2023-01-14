@@ -106,6 +106,7 @@ DetermineAutorunPartitionLocation()
 
     ShowAsError 'unable to determine the autorun partition location'
     exitcode=1
+    return 1
 
     }
 
@@ -123,6 +124,7 @@ CreateMountPoint()
 
     ShowAsError "unable to create a temporary mount-point ($MOUNT_BASE_PATH.XXXXXX)"
     exitcode=2
+    return 1
 
     }
 
@@ -471,8 +473,8 @@ ColourReset()
     }
 
 Init || exit
-DetermineAutorunPartitionLocation
-CreateMountPoint
+DetermineAutorunPartitionLocation || exit
+CreateMountPoint || exit
 MountAutorunPartition
 ConfirmAutorunPartition
 CreateProcessor
