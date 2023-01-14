@@ -29,19 +29,22 @@ Init()
 
     local -r SCRIPT_FILE=create-autorun.sh
     local -r SCRIPT_VERSION=230114
+    exitcode=0
 
     # include QNAP functions
     if [[ -e /etc/init.d/functions ]]; then
         . /etc/init.d/functions
     else
         ShowAsError 'QNAP OS functions missing (is this a QNAP NAS?): aborting ...'
-        return 1
+        exitcode=1
+        return
     fi
 
     if [[ $EUID -ne 0 ]]; then
         ShowAsError 'this script must be run with superuser privileges. Try again as:'
         echo 'curl -skL https://git.io/create-autorun | sudo bash'
-        return 1
+        exitcode=2
+        return
     fi
 
     FindDefVol
@@ -66,7 +69,6 @@ Init()
 
     partition_mounted=false
     script_store_created=false
-    exitcode=0
 
     }
 
@@ -105,8 +107,7 @@ DetermineAutorunPartitionLocation()
     fi
 
     ShowAsError 'unable to determine the autorun partition location'
-    exitcode=1
-    return 1
+    exitcode=3
 
     }
 
@@ -123,8 +124,7 @@ CreateMountPoint()
     fi
 
     ShowAsError "unable to create a temporary mount-point ($MOUNT_BASE_PATH.XXXXXX)"
-    exitcode=2
-    return 1
+    exitcode=4
 
     }
 
@@ -164,7 +164,7 @@ MountAutorunPartition()
 
     ShowAsError "unable to mount $mount_type autorun partition: $autorun_partition '$result_msg'"
     partition_mounted=false
-    exitcode=3
+    exitcode=5
 
     }
 
@@ -186,7 +186,7 @@ ConfirmAutorunPartition()
     done
 
     ShowAsError 'partition tag-file not found'
-    exitcode=4
+    exitcode=6
 
     }
 
@@ -232,7 +232,7 @@ EOF
     fi
 
     ShowAsError "unable to create autorun script processor $AUTORUN_PROCESSOR_PATHFILE"
-    exitcode=5
+    exitcode=7
 
     }
 
@@ -248,7 +248,7 @@ CreateScriptStore()
     fi
 
     ShowAsError "unable to create script store $SCRIPT_STORE_PATH"
-    exitcode=6
+    exitcode=8
 
     }
 
@@ -268,7 +268,7 @@ AddLinkFromAutorunPartition()
     fi
 
     ShowAsError 'unable to create symlink'
-    exitcode=7
+    exitcode=9
 
     }
 
@@ -300,7 +300,7 @@ UnmountAutorunPartition()
         partition_mounted=false
     else
         ShowAsError "unable to unmount $mount_type autorun partition"
-        exitcode=8
+        exitcode=10
     fi
 
     [[ $NAS_AUTORUN_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_AUTORUN_PART"
@@ -319,7 +319,7 @@ RemoveMountPoint()
     fi
 
     ShowAsError "unable to remove temporary mount-point: $mount_point"
-    exitcode=9
+    exitcode=11
 
     }
 
@@ -327,7 +327,6 @@ ShowResult()
     {
 
     [[ $exitcode -eq 0 ]] || return
-    echo
     [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into: $SCRIPT_STORE_PATH"
     [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at: $AUTORUN_PROCESSOR_PATHFILE"
 
@@ -472,9 +471,9 @@ ColourReset()
 
     }
 
-Init || exit
-DetermineAutorunPartitionLocation || exit
-CreateMountPoint || exit
+Init
+DetermineAutorunPartitionLocation
+CreateMountPoint
 MountAutorunPartition
 ConfirmAutorunPartition
 CreateProcessor
@@ -483,6 +482,5 @@ EnableAutorun
 UnmountAutorunPartition
 RemoveMountPoint
 ShowResult
-echo
 
 exit "$exitcode"
