@@ -88,7 +88,7 @@ DetermineAutorunPartitionLocation()
             fi
 
             case $(/sbin/getcfg System Model) in
-                TS-X28A|TS-XA28A|TS-X33|TS-X35EU)
+                TS-X16|TS-X28A|TS-XA28A|TS-X33|TS-X35EU)
                     autorun_partition+=5
                     ;;
                 *)
