@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230114
+    local -r SCRIPT_VERSION=230115
     exitcode=0
 
     # include QNAP functions
