@@ -4,7 +4,7 @@
 
 # Copyright (C) 2017-2023 OneCD [one.cd.only@gmail.com]
 
-# Create an autorun environment suited to this model QNAP NAS.
+# Create an autorun environment suited to this model QNAP NAS
 
 # For more info: https://forum.qnap.com/viewtopic.php?f=45&t=130345
 
@@ -21,14 +21,14 @@
 # details.
 
 # You should have received a copy of the GNU General Public License along with
-# this program. If not, see http://www.gnu.org/licenses/.
+# this program. If not, see http://www.gnu.org/licenses/
 ####################################################################################
 
 Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230115
+    local -r SCRIPT_VERSION=230117
     exitcode=0
 
     # include QNAP functions
@@ -59,16 +59,16 @@ Init()
     readonly AUTORUN_PATH=$DEF_VOLMP/.system/autorun
     readonly SCRIPT_STORE_PATH=$AUTORUN_PATH/scripts
     readonly MOUNT_BASE_PATH=/tmp/${SCRIPT_FILE%.*}
-    readonly AUTORUN_PROCESSOR_PATHFILE=$AUTORUN_PATH/$AUTORUN_FILE
+    readonly AUTORUN_PATHFILE=$AUTORUN_PATH/$AUTORUN_FILE
+    autorun_partition=''
+    partition_mounted=false
+    script_store_created=false
 
     echo "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)"
     echo
     ShowAsInfo "NAS model: $(get_display_name)"
     ShowAsInfo "$(GetQnapOS) version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
     ShowAsInfo "default volume: $DEF_VOLMP"
-
-    partition_mounted=false
-    script_store_created=false
 
     }
 
@@ -117,11 +117,7 @@ CreateMountPoint()
     [[ $exitcode -eq 0 ]] || return
 
     mount_point=$(/bin/mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
-
-    if [[ $? -eq 0 ]]; then
-        ShowAsDone "created temporary mount-point: $mount_point"
-        return
-    fi
+    [[ $? -eq 0 ]] && return
 
     ShowAsError "unable to create a temporary mount-point ($MOUNT_BASE_PATH.XXXXXX)"
     exitcode=4
@@ -174,7 +170,7 @@ ConfirmAutorunPartition()
     [[ $exitcode -eq 0 ]] || return
 
     # Look for a known file to confirm this is the autorun partition.
-    # Include an alternative file to confirm this is the autorun partition on QuTS. https://github.com/OneCDOnly/create-autorun/issues/10
+    # Include an alternative file to confirm autorun partition on QuTS. https://github.com/OneCDOnly/create-autorun/issues/10
 
     local tag_file=''
 
@@ -197,14 +193,14 @@ CreateProcessor()
 
     [[ ! -d $AUTORUN_PATH ]] && mkdir -p "$AUTORUN_PATH"
 
-    if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
-        ShowAsSkip "$AUTORUN_FILE already exists: $AUTORUN_PROCESSOR_PATHFILE"
+    if [[ -e $AUTORUN_PATHFILE ]]; then
+        ShowAsSkip "$AUTORUN_FILE already exists: $AUTORUN_PATHFILE"
         return
     fi
 
     # write a new scripts directory processor to disk
 
-    cat > "$AUTORUN_PROCESSOR_PATHFILE" << EOF
+    cat > "$AUTORUN_PATHFILE" << EOF
 #!/usr/bin/env bash
 # source: https://github.com/OneCDOnly/create-autorun
 
@@ -224,14 +220,14 @@ done
 echo "\$(date) -- end processing --" >> "\$LOGFILE"
 EOF
 
-    if [[ -e $AUTORUN_PROCESSOR_PATHFILE ]]; then
-        ShowAsDone "created autorun script processor: $AUTORUN_PROCESSOR_PATHFILE"
-        chmod +x "$AUTORUN_PROCESSOR_PATHFILE"
+    if [[ -e $AUTORUN_PATHFILE ]]; then
+        ShowAsDone "created autorun script processor: $AUTORUN_PATHFILE"
+        chmod +x "$AUTORUN_PATHFILE"
         CreateScriptStore
         return
     fi
 
-    ShowAsError "unable to create autorun script processor $AUTORUN_PROCESSOR_PATHFILE"
+    ShowAsError "unable to create autorun script processor $AUTORUN_PATHFILE"
     exitcode=7
 
     }
@@ -258,7 +254,7 @@ AddLinkFromAutorunPartition()
     [[ $exitcode -eq 0 ]] || return
 
     if [[ ! -L "$mount_point/$AUTORUN_FILE" ]]; then
-        if ln -sf "$AUTORUN_PROCESSOR_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
+        if ln -sf "$AUTORUN_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
             ShowAsDone "created symlink from partition to $AUTORUN_FILE"
             return
         fi
@@ -313,10 +309,7 @@ RemoveMountPoint()
     [[ $partition_mounted = false ]] || return
     [[ -e $mount_point ]] || return
 
-    if rmdir "$mount_point"; then
-        ShowAsDone 'removed temporary mount-point'
-        return
-    fi
+    rmdir "$mount_point" && return
 
     ShowAsError "unable to remove temporary mount-point: $mount_point"
     exitcode=11
@@ -328,7 +321,7 @@ ShowResult()
 
     [[ $exitcode -eq 0 ]] || return
     [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into: $SCRIPT_STORE_PATH"
-    [[ -e $AUTORUN_PROCESSOR_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at: $AUTORUN_PROCESSOR_PATHFILE"
+    [[ -e $AUTORUN_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at: $AUTORUN_PATHFILE"
 
     }
 
