@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230117
+    local -r SCRIPT_VERSION=230207
     exitcode=0
 
     # include QNAP functions
@@ -64,7 +64,7 @@ Init()
     partition_mounted=false
     script_store_created=false
 
-    echo "$(ColourTextBrightWhite "$SCRIPT_FILE") ($SCRIPT_VERSION)"
+    echo "$(ColourTextBrightWhite "$SCRIPT_FILE") $SCRIPT_VERSION"
     echo
     ShowAsInfo "NAS model: $(get_display_name)"
     ShowAsInfo "$(GetQnapOS) version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
