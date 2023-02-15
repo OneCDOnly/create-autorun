@@ -2,7 +2,7 @@
 ####################################################################################
 # create-autorun.sh
 
-# Copyright (C) 2017-2023 OneCD [one.cd.only@gmail.com]
+# Copyright (C) 2017-2023 OneCD - one.cd.only@gmail.com
 
 # Create an autorun environment suited to this model QNAP NAS
 
@@ -17,7 +17,7 @@
 
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 # details.
 
 # You should have received a copy of the GNU General Public License along with
@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230207
+    local -r SCRIPT_VERSION=230215
     exitcode=0
 
     # include QNAP functions
@@ -88,7 +88,7 @@ DetermineAutorunPartitionLocation()
             fi
 
             case $(/sbin/getcfg System Model) in
-                TS-X16|TS-X28A|TS-XA28A|TS-X33|TS-X35EU)
+                TS-X16|TS-X28A|TS-XA28A|TS-X32|TS-X33|TS-X35EU)
                     autorun_partition+=5
                     ;;
                 *)
