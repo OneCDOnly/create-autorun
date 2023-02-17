@@ -28,7 +28,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230216
+    local -r SCRIPT_VERSION=230218
     exitcode=0
 
     # include QNAP functions
@@ -78,15 +78,7 @@ DetermineAutorunPartitionLocation()
     [[ $exitcode -eq 0 ]] || return
 
     if [[ -n $NAS_DEV_NODE ]]; then
-        autorun_partition=${NAS_DEV_NODE}
-
-        case $(/sbin/getcfg System Model) in
-            TS-X32)
-                autorun_partition+=5
-                ;;
-            *)
-                autorun_partition+=${NAS_AUTORUN_PART}
-        esac
+		autorun_partition=${NAS_DEV_NODE}${NAS_AUTORUN_PART}
     else
         if [[ -e /sbin/hal_app ]]; then
             if /bin/grep -q zfs /proc/filesystems; then       # NAS is running QuTS
