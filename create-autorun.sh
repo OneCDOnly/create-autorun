@@ -24,11 +24,13 @@
 # this program. If not, see http://www.gnu.org/licenses/
 ####################################################################################
 
+readonly USER_ARGS_RAW=$*
+
 Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230218
+    local -r SCRIPT_VERSION=230319
     exitcode=0
 
     # include QNAP functions
@@ -253,15 +255,15 @@ AddLinkFromAutorunPartition()
 
     [[ $exitcode -eq 0 ]] || return
 
-    if [[ ! -L "$mount_point/$AUTORUN_FILE" ]]; then
-        if ln -sf "$AUTORUN_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
-            ShowAsDone "created symlink from partition to $AUTORUN_FILE"
-            return
-        fi
-    else
+    if [[ -L "$mount_point/$AUTORUN_FILE" && $USER_ARGS_RAW != force ]]; then
         ShowAsSkip "symlink from partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
         return
-    fi
+	fi
+
+	if ln -sf "$AUTORUN_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
+		ShowAsDone "created symlink from partition to $AUTORUN_FILE"
+		return
+	fi
 
     ShowAsError 'unable to create symlink'
     exitcode=9
