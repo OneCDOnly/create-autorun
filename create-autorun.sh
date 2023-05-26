@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 ####################################################################################
 # create-autorun.sh
-
+#
 # Copyright (C) 2017-2023 OneCD - one.cd.only@gmail.com
-
+#
 # Create an autorun environment suited to this model QNAP NAS
-
+#
 # For more info: https://forum.qnap.com/viewtopic.php?f=45&t=130345
-
+#
 # Project source: https://github.com/OneCDOnly/create-autorun
-
+#
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 # details.
-
+#
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see http://www.gnu.org/licenses/
 ####################################################################################
@@ -30,7 +30,7 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230319
+    local -r SCRIPT_VERSION=230527
     exitcode=0
 
     # include QNAP functions
@@ -118,7 +118,7 @@ CreateMountPoint()
 
     [[ $exitcode -eq 0 ]] || return
 
-    mount_point=$(/bin/mktemp -d $MOUNT_BASE_PATH.XXXXXX 2> /dev/null)
+    mount_point=$(/bin/mktemp -d $MOUNT_BASE_PATH.XXXXXX 2>/dev/null)
     [[ $? -eq 0 ]] && return
 
     ShowAsError "unable to create a temporary mount-point ($MOUNT_BASE_PATH.XXXXXX)"
@@ -131,36 +131,35 @@ MountAutorunPartition()
 
     [[ $exitcode -eq 0 ]] || return
 
-    local mount_dev=''
+    local mount_dev=$autorun_partition
     local result_msg=''
 
     if [[ $NAS_AUTORUN_FS = ubifs ]]; then
-        result_msg=$(/sbin/ubiattach -m "$NAS_AUTORUN_PART" -d 2 2>&1)
+        result_msg=$(/sbin/ubiattach -m "$NAS_AUTORUN_PART" -d 2 2>/dev/null)
 
         if [[ $? -eq 0 ]]; then
-            ShowAsDone "ubiattached autorun partition: $NAS_AUTORUN_PART"
+            ShowAsDone "ubiattached partition: $NAS_AUTORUN_PART"
             mount_type=ubifs
             mount_dev=ubi2:config
         else
-            ShowAsSkip "unable to ubiattach '$result_msg'"
+            ShowAsSkip "unable to ubiattach"
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
-            ShowAsInfo "will try as $mount_type instead"
+            ShowAsInfo "will try as: $mount_type instead"
         fi
     else
         mount_type=ext2
-        mount_dev=$autorun_partition
     fi
 
     result_msg=$(/bin/mount -t $mount_type $mount_dev "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "mounted $mount_type autorun partition: $autorun_partition -> $mount_point"
+        ShowAsDone "mounted: $mount_type device: $mount_dev -> $mount_point"
         partition_mounted=true
         return
     fi
 
-    ShowAsError "unable to mount $mount_type autorun partition: $autorun_partition '$result_msg'"
+    ShowAsError "unable to mount: $mount_type device: $mount_dev '$result_msg'"
     partition_mounted=false
     exitcode=5
 
@@ -179,12 +178,12 @@ ConfirmAutorunPartition()
     for tag_file in uLinux.conf .sys_update_time; do
         if [[ -e $mount_point/$tag_file ]]; then
             ShowAsInfo "confirmed partition tag-file exists: $tag_file $(ColourTextBrightGreen "(we're in the right place)")"
-            return 0
+			return 0
         fi
     done
 
-    ShowAsError 'partition tag-file not found'
-    exitcode=6
+    ShowAsInfo 'partition tag-file not found'
+	return 0
 
     }
 
@@ -301,7 +300,7 @@ UnmountAutorunPartition()
         exitcode=10
     fi
 
-    [[ $NAS_AUTORUN_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_AUTORUN_PART"
+    [[ $NAS_AUTORUN_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_AUTORUN_PART" 2>/dev/null
 
     }
 
