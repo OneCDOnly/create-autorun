@@ -2,7 +2,7 @@
 ####################################################################################
 # create-autorun.sh
 #
-# Copyright (C) 2017-2023 OneCD - one.cd.only@gmail.com
+# Copyright (C) 2017-2024 OneCD - one.cd.only@gmail.com
 #
 # Create an autorun environment suited to this model QNAP NAS
 #
@@ -30,10 +30,11 @@ Init()
     {
 
     local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=230527
+    local -r SCRIPT_VERSION=241219
     exitcode=0
 
-    # include QNAP functions
+    # Include QNAP functions.
+
     if [[ -e /etc/init.d/functions ]]; then
         . /etc/init.d/functions
     else
@@ -66,10 +67,9 @@ Init()
     partition_mounted=false
     script_store_created=false
 
-    echo "$(ColourTextBrightWhite "$SCRIPT_FILE") $SCRIPT_VERSION"
-    echo
+    echo "$(TextBrightWhite "$SCRIPT_FILE") v$SCRIPT_VERSION"
     ShowAsInfo "NAS model: $(get_display_name)"
-    ShowAsInfo "$(GetQnapOS) version: $(/sbin/getcfg System Version) #$(/sbin/getcfg System 'Build Number')"
+    ShowAsInfo "$(GetQnapOS) version: $(/sbin/getcfg System Version) build $(/sbin/getcfg System 'Build Number')"
     ShowAsInfo "default volume: $DEF_VOLMP"
 
     }
@@ -83,7 +83,7 @@ DetermineAutorunPartitionLocation()
 		autorun_partition=${NAS_DEV_NODE}${NAS_AUTORUN_PART}
     else
         if [[ -e /sbin/hal_app ]]; then
-            if /bin/grep -q zfs /proc/filesystems; then       # NAS is running QuTS
+            if IsQuTS; then
                 autorun_partition=$NAS_SYSTEM_DEV
             else
                 autorun_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
@@ -108,7 +108,7 @@ DetermineAutorunPartitionLocation()
         return
     fi
 
-    ShowAsError 'unable to determine the autorun partition location'
+    ShowAsError 'unable to determine autorun partition location'
     exitcode=3
 
     }
@@ -142,7 +142,7 @@ MountAutorunPartition()
             mount_type=ubifs
             mount_dev=ubi2:config
         else
-            ShowAsSkip "unable to ubiattach"
+            ShowAsSkip 'unable to ubiattach'
             mount_type=ext4
             mount_dev=/dev/mmcblk0p7
             ShowAsInfo "will try as: $mount_type instead"
@@ -154,12 +154,12 @@ MountAutorunPartition()
     result_msg=$(/bin/mount -t $mount_type $mount_dev "$mount_point" 2>&1)
 
     if [[ $? -eq 0 ]]; then
-        ShowAsDone "mounted: $mount_type device: $mount_dev -> $mount_point"
+        ShowAsDone "mounted $mount_type device: $mount_dev -> $mount_point"
         partition_mounted=true
         return
     fi
 
-    ShowAsError "unable to mount: $mount_type device: $mount_dev '$result_msg'"
+    ShowAsError "unable to mount $mount_type device: $mount_dev '$result_msg'"
     partition_mounted=false
     exitcode=5
 
@@ -177,7 +177,7 @@ ConfirmAutorunPartition()
 
     for tag_file in uLinux.conf .sys_update_time; do
         if [[ -e $mount_point/$tag_file ]]; then
-            ShowAsInfo "confirmed partition tag-file exists: $tag_file $(ColourTextBrightGreen "(we're in the right place)")"
+            ShowAsInfo "confirmed partition tag-file exists: '$tag_file' ($(TextBrightGreen "we're in the right place"))"
 			return 0
         fi
     done
@@ -195,7 +195,7 @@ CreateProcessor()
     [[ ! -d $AUTORUN_PATH ]] && mkdir -p "$AUTORUN_PATH"
 
     if [[ -e $AUTORUN_PATHFILE ]]; then
-        ShowAsSkip "$AUTORUN_FILE already exists: $AUTORUN_PATHFILE"
+        ShowAsSkip "'$AUTORUN_FILE' already exists: $AUTORUN_PATHFILE"
         return
     fi
 
@@ -222,13 +222,13 @@ echo "\$(date) -- end processing --" >> "\$LOGFILE"
 EOF
 
     if [[ -e $AUTORUN_PATHFILE ]]; then
-        ShowAsDone "created autorun script processor: $AUTORUN_PATHFILE"
+        ShowAsDone "created script processor: $AUTORUN_PATHFILE"
         chmod +x "$AUTORUN_PATHFILE"
         CreateScriptStore
         return
     fi
 
-    ShowAsError "unable to create autorun script processor $AUTORUN_PATHFILE"
+    ShowAsError "unable to create script processor $AUTORUN_PATHFILE"
     exitcode=7
 
     }
@@ -255,12 +255,12 @@ AddLinkFromAutorunPartition()
     [[ $exitcode -eq 0 ]] || return
 
     if [[ -L "$mount_point/$AUTORUN_FILE" && $USER_ARGS_RAW != force ]]; then
-        ShowAsSkip "symlink from partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
+        ShowAsSkip "symlink from autorun partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
         return
 	fi
 
 	if ln -sf "$AUTORUN_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
-		ShowAsDone "created symlink from partition to $AUTORUN_FILE"
+		ShowAsDone "created symlink from autorun partition to $AUTORUN_FILE"
 		return
 	fi
 
@@ -279,9 +279,9 @@ EnableAutorun()
     if [[ ${fwvers//.} -ge 430 ]]; then
         if [[ $(/sbin/getcfg Misc Autorun) != TRUE ]]; then
             /sbin/setcfg Misc Autorun TRUE
-            ShowAsDone 'enabled autorun.sh in OS'
+            ShowAsDone "enabled '$AUTORUN_FILE' in $(GetQnapOS)"
         else
-            ShowAsSkip 'autorun.sh is already enabled in OS'
+            ShowAsSkip "'$AUTORUN_FILE' is already enabled in $(GetQnapOS)"
         fi
     fi
 
@@ -293,10 +293,10 @@ UnmountAutorunPartition()
     [[ $partition_mounted = true ]] || return
 
     if /bin/umount "$mount_point"; then
-        ShowAsDone "unmounted $mount_type autorun partition" "$mount_point"
+        ShowAsDone "unmounted $mount_type autorun partition: $mount_point"
         partition_mounted=false
     else
-        ShowAsError "unable to unmount $mount_type autorun partition"
+        ShowAsError "unable to unmount $mount_type autorun partition: $mount_point"
         exitcode=10
     fi
 
@@ -322,28 +322,28 @@ ShowResult()
 
     [[ $exitcode -eq 0 ]] || return
     [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into: $SCRIPT_STORE_PATH"
-    [[ -e $AUTORUN_PATHFILE ]] && ShowAsInfo "your autorun.sh file is located at: $AUTORUN_PATHFILE"
+    [[ -e $AUTORUN_PATHFILE ]] && ShowAsInfo "your '$AUTORUN_FILE' file is located at: $AUTORUN_PATHFILE"
 
     }
 
 ShowAsInfo()
     {
 
-    WriteToDisplay.New "$(ColourTextBrightYellow info)" "${1:-}"
+    Show "$(TextBrightYellow info)" "${1:-}"
 
     }
 
 ShowAsSkip()
     {
 
-    WriteToDisplay.New "$(ColourTextBrightOrange skip)" "${1:-}"
+    Show "$(TextBrightOrange skip)" "${1:-}"
 
     }
 
 ShowAsDone()
     {
 
-    WriteToDisplay.New "$(ColourTextBrightGreen 'done')" "${1:-}"
+    Show "$(TextBrightGreen 'done')" "${1:-}"
 
     }
 
@@ -352,116 +352,71 @@ ShowAsError()
 
     local buffer="${1:-}"
 
-    WriteToDisplay.New "$(ColourTextBrightRed fail)" "$(tr 'a-z' 'A-Z' <<< "${buffer:0:1}")${buffer:1}"
+    Show "$(TextBrightRed fail)" "$(tr 'a-z' 'A-Z' <<< "${buffer:0:1}")${buffer:1}"
 
     }
 
-WriteToDisplay.Wait()
+Show()
     {
 
-    # Write a new message without newline
-
-    # input:
+    # Input:
     #   $1 = pass/fail
     #   $2 = message
 
-    previous_msg=$(printf "%-10s: %s" "${1:-}" "${2:-}")
-
-    echo -n "$previous_msg"
-
-    return 0
-
-    }
-
-WriteToDisplay.New()
-    {
-
-    # Update the previous message
-
-    # input:
-    #   $1 = pass/fail
-    #   $2 = message
-
-    # output:
-    #   stdout = overwrites previous message with updated message
-    #   $previous_length
-    #   $appended_length
-
-    local new_message=''
-    local strbuffer=''
-    local new_length=0
-    new_message=$(printf "%-10s: %s" "$1" "$2")
-
-    if [[ $new_message != "$previous_msg" ]]; then
-        previous_length=$((${#previous_msg}+1))
-        new_length=$((${#new_message}+1))
-
-        # jump to start of line, print new msg
-        strbuffer=$(echo -en "\r$new_message ")
-
-        # if new msg is shorter then add spaces to end to cover previous msg
-        if [[ $new_length -lt $previous_length ]]; then
-            appended_length=$((new_length-previous_length))
-            strbuffer+=$(printf "%${appended_length}s")
-        fi
-
-        echo "$strbuffer"
-    fi
-
-    return 0
+    printf '%-10s: %s\n' "$1" "$2"
 
     }
 
 GetQnapOS()
     {
 
-    if /bin/grep -q zfs /proc/filesystems; then
-        echo 'QuTS hero'
+    if IsQuTS; then
+        printf 'QuTS hero'
     else
-        echo QTS
+        printf QTS
     fi
 
     }
 
-ColourTextBrightGreen()
+IsQuTS()
     {
 
-    echo -en '\033[1;32m'"$(ColourReset "${1:-}")"
+    /bin/grep -q zfs /proc/filesystems
 
     }
 
-ColourTextBrightYellow()
+TextBrightGreen()
     {
 
-    echo -en '\033[1;33m'"$(ColourReset "${1:-}")"
+    printf '\033[1;32m%s\033[0m' "$1"
 
     }
 
-ColourTextBrightOrange()
+TextBrightYellow()
     {
 
-    echo -en '\033[1;38;5;214m'"$(ColourReset "${1:-}")"
+    printf '\033[1;33m%s\033[0m' "$1"
 
     }
 
-ColourTextBrightRed()
+TextBrightOrange()
     {
 
-    echo -en '\033[1;31m'"$(ColourReset "${1:-}")"
+    printf '\033[1;38;5;214m%s\033[0m' "$1"
 
     }
 
-ColourTextBrightWhite()
+TextBrightRed()
     {
 
-    echo -en '\033[1;97m'"$(ColourReset "${1:-}")"
+    printf '\033[1;31m%s\033[0m' "$1"
 
     }
 
-ColourReset()
+TextBrightWhite()
     {
 
-    echo -en "${1:-}"'\033[0m'
+    printf '\033[1;97m%s\033[0m' "$1"
 
     }
 
