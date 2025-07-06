@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 ####################################################################################
 # create-autorun.sh
+#   Copyright 2017-2025 OneCD
 #
-# Copyright (C) 2017-2024 OneCD - one.cd.only@gmail.com
+# Contact:
+#   one.cd.only@gmail.com
 #
-# Create an autorun environment suited to this model QNAP NAS
+# Description:
+#   Create an autorun environment suited to this model QNAP NAS
 #
-# For more info: https://forum.qnap.com/viewtopic.php?f=45&t=130345
+# Community forum:
+#   https://community.qnap.com/t/script-create-autorun-sh/1096
 #
-# Project source: https://github.com/OneCDOnly/create-autorun
+# Project source:
+#   https://github.com/OneCDOnly/create-autorun
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -24,13 +29,15 @@
 # this program. If not, see http://www.gnu.org/licenses/
 ####################################################################################
 
-readonly USER_ARGS_RAW=$*
+set -o nounset -o pipefail
+[[ -L /dev/fd ]] || ln -fns /proc/self/fd /dev/fd		# KLUDGE: `/dev/fd` isn't always created by QTS.
+readonly r_user_args_raw=$*
 
 Init()
     {
 
-    local -r SCRIPT_FILE=create-autorun.sh
-    local -r SCRIPT_VERSION=241219
+    local -r r_script_file=create-autorun.sh
+    local -r r_script_version=250706
     exitcode=0
 
     # Include QNAP functions.
@@ -52,22 +59,22 @@ Init()
 
     FindDefVol
 
-    readonly NAS_ARC=$(</etc/default_config/BOOT.conf)
-    readonly NAS_DEV_NODE=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f /etc/platform.conf)
-    readonly NAS_AUTORUN_PART=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f /etc/platform.conf)
-    readonly NAS_AUTORUN_FS=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f /etc/platform.conf)
-    readonly NAS_SYSTEM_DEV=$(/sbin/getcfg System 'System Device' -f /etc/config/uLinux.conf)
+    readonly r_nas_arc=$(</etc/default_config/BOOT.conf)
+    readonly r_nas_dev_node=$(/sbin/getcfg 'CONFIG STORAGE' DEVICE_NODE -f /etc/platform.conf)
+    readonly r_nas_autorun_part=$(/sbin/getcfg 'CONFIG STORAGE' FS_ACTIVE_PARTITION -f /etc/platform.conf)
+    readonly r_nas_autorun_fs=$(/sbin/getcfg 'CONFIG STORAGE' FS_TYPE -f /etc/platform.conf)
+    readonly r_nas_system_dev=$(/sbin/getcfg System 'System Device' -f /etc/config/uLinux.conf)
 
-    readonly AUTORUN_FILE=autorun.sh
-    readonly AUTORUN_PATH=$DEF_VOLMP/.system/autorun
-    readonly SCRIPT_STORE_PATH=$AUTORUN_PATH/scripts
-    readonly MOUNT_BASE_PATH=/tmp/${SCRIPT_FILE%.*}
-    readonly AUTORUN_PATHFILE=$AUTORUN_PATH/$AUTORUN_FILE
+    readonly r_autorun_file=autorun.sh
+    readonly r_autorun_path=$DEF_VOLMP/.system/autorun
+    readonly r_script_store_path=$r_autorun_path/scripts
+    readonly r_mount_base_path=/tmp/${r_script_file%.*}
+    readonly r_autorun_pathfile=$r_autorun_path/$r_autorun_file
     autorun_partition=''
     partition_mounted=false
     script_store_created=false
 
-    echo "$(TextBrightWhite "$SCRIPT_FILE") v$SCRIPT_VERSION"
+    echo "$(TextBrightWhite "$r_script_file") v$r_script_version"
     ShowAsInfo "NAS model: $(get_display_name)"
     ShowAsInfo "$(GetQnapOS) version: $(/sbin/getcfg System Version) build $(/sbin/getcfg System 'Build Number')"
     ShowAsInfo "default volume: $DEF_VOLMP"
@@ -79,12 +86,12 @@ DetermineAutorunPartitionLocation()
 
     [[ $exitcode -eq 0 ]] || return
 
-    if [[ -n $NAS_DEV_NODE ]]; then
-		autorun_partition=${NAS_DEV_NODE}${NAS_AUTORUN_PART}
+    if [[ -n $r_nas_dev_node ]]; then
+		autorun_partition=${r_nas_dev_node}${r_nas_autorun_part}
     else
         if [[ -e /sbin/hal_app ]]; then
             if IsQuTS; then
-                autorun_partition=$NAS_SYSTEM_DEV
+                autorun_partition=$r_nas_system_dev
             else
                 autorun_partition=$(/sbin/hal_app --get_boot_pd port_id=0)
             fi
@@ -96,7 +103,7 @@ DetermineAutorunPartitionLocation()
                 *)
                     autorun_partition+=6
             esac
-        elif [[ $NAS_ARC = TS-NASARM ]]; then
+        elif [[ $r_nas_arc = TS-NASARM ]]; then
             autorun_partition=/dev/mtdblock5
         else
             autorun_partition=/dev/sdx6
@@ -118,10 +125,10 @@ CreateMountPoint()
 
     [[ $exitcode -eq 0 ]] || return
 
-    mount_point=$(/bin/mktemp -d $MOUNT_BASE_PATH.XXXXXX 2>/dev/null)
+    mount_point=$(/bin/mktemp -d $r_mount_base_path.XXXXXX 2>/dev/null)
     [[ $? -eq 0 ]] && return
 
-    ShowAsError "unable to create a temporary mount-point ($MOUNT_BASE_PATH.XXXXXX)"
+    ShowAsError "unable to create a temporary mount-point: $r_mount_base_path.XXXXXX"
     exitcode=4
 
     }
@@ -134,11 +141,11 @@ MountAutorunPartition()
     local mount_dev=$autorun_partition
     local result_msg=''
 
-    if [[ $NAS_AUTORUN_FS = ubifs ]]; then
-        result_msg=$(/sbin/ubiattach -m "$NAS_AUTORUN_PART" -d 2 2>/dev/null)
+    if [[ $r_nas_autorun_fs = ubifs ]]; then
+        result_msg=$(/sbin/ubiattach -m "$r_nas_autorun_part" -d 2 2>/dev/null)
 
         if [[ $? -eq 0 ]]; then
-            ShowAsDone "ubiattached partition: $NAS_AUTORUN_PART"
+            ShowAsDone "ubiattached partition: $r_nas_autorun_part"
             mount_type=ubifs
             mount_dev=ubi2:config
         else
@@ -192,43 +199,43 @@ CreateProcessor()
 
     [[ $exitcode -eq 0 ]] || return
 
-    [[ ! -d $AUTORUN_PATH ]] && mkdir -p "$AUTORUN_PATH"
+    [[ ! -d $r_autorun_path ]] && mkdir -p "$r_autorun_path"
 
-    if [[ -e $AUTORUN_PATHFILE ]]; then
-        ShowAsSkip "'$AUTORUN_FILE' already exists: $AUTORUN_PATHFILE"
+    if [[ -e $r_autorun_pathfile ]]; then
+        ShowAsSkip "'$r_autorun_file' already exists: $r_autorun_pathfile"
         return
     fi
 
-    # write a new scripts directory processor to disk
+    # Write a new scripts directory processor to disk.
 
-    cat > "$AUTORUN_PATHFILE" << EOF
+    cat > "$r_autorun_pathfile" << EOF
 #!/usr/bin/env bash
 # source: https://github.com/OneCDOnly/create-autorun
 
-readonly LOGFILE=/var/log/autorun.log
+readonly r_logfile=/var/log/autorun.log
 f=''
 
-echo "\$(date) -- begin processing --" >> "\$LOGFILE"
+echo "\$(date) -- begin processing --" >> "\$r_logfile"
 
-for f in $SCRIPT_STORE_PATH/*; do
+for f in $r_script_store_path/*; do
     if [[ -x \$f ]]; then
-        echo -n "\$(date)" >> "\$LOGFILE"
-        echo " executing \$f ..." >> "\$LOGFILE"
-        \$f >> "\$LOGFILE" 2>&1
+        echo -n "\$(date)" >> "\$r_logfile"
+        echo " executing \$f ..." >> "\$r_logfile"
+        \$f >> "\$r_logfile" 2>&1
     fi
 done
 
-echo "\$(date) -- end processing --" >> "\$LOGFILE"
+echo "\$(date) -- end processing --" >> "\$r_logfile"
 EOF
 
-    if [[ -e $AUTORUN_PATHFILE ]]; then
-        ShowAsDone "created script processor: $AUTORUN_PATHFILE"
-        chmod +x "$AUTORUN_PATHFILE"
+    if [[ -e $r_autorun_pathfile ]]; then
+        ShowAsDone "created script processor: $r_autorun_pathfile"
+        chmod +x "$r_autorun_pathfile"
         CreateScriptStore
         return
     fi
 
-    ShowAsError "unable to create script processor $AUTORUN_PATHFILE"
+    ShowAsError "unable to create script processor: $r_autorun_pathfile"
     exitcode=7
 
     }
@@ -238,13 +245,13 @@ CreateScriptStore()
 
     [[ $exitcode -eq 0 ]] || return
 
-    if mkdir -p "$SCRIPT_STORE_PATH"; then
-        ShowAsDone "created script store: $SCRIPT_STORE_PATH"
+    if mkdir -p "$r_script_store_path"; then
+        ShowAsDone "created script store: $r_script_store_path"
         script_store_created=true
         return 0
     fi
 
-    ShowAsError "unable to create script store $SCRIPT_STORE_PATH"
+    ShowAsError "unable to create script store: $r_script_store_path"
     exitcode=8
 
     }
@@ -254,13 +261,13 @@ AddLinkFromAutorunPartition()
 
     [[ $exitcode -eq 0 ]] || return
 
-    if [[ -L "$mount_point/$AUTORUN_FILE" && $USER_ARGS_RAW != force ]]; then
-        ShowAsSkip "symlink from autorun partition already exists and points to: $(/usr/bin/readlink "$mount_point/$AUTORUN_FILE")"
+    if [[ -L "$mount_point/$r_autorun_file" && $r_user_args_raw != force ]]; then
+        ShowAsSkip "symlink from autorun partition already exists and points to: $(/usr/bin/readlink "$mount_point/$r_autorun_file")"
         return
 	fi
 
-	if ln -sf "$AUTORUN_PATHFILE" "$mount_point/$AUTORUN_FILE"; then
-		ShowAsDone "created symlink from autorun partition to $AUTORUN_FILE"
+	if ln -sf "$r_autorun_pathfile" "$mount_point/$r_autorun_file"; then
+		ShowAsDone "created symlink from autorun partition to: $r_autorun_file"
 		return
 	fi
 
@@ -279,9 +286,9 @@ EnableAutorun()
     if [[ ${fwvers//.} -ge 430 ]]; then
         if [[ $(/sbin/getcfg Misc Autorun) != TRUE ]]; then
             /sbin/setcfg Misc Autorun TRUE
-            ShowAsDone "enabled '$AUTORUN_FILE' in $(GetQnapOS)"
+            ShowAsDone "enabled '$r_autorun_file' in $(GetQnapOS)"
         else
-            ShowAsSkip "'$AUTORUN_FILE' is already enabled in $(GetQnapOS)"
+            ShowAsSkip "'$r_autorun_file' is already enabled in $(GetQnapOS)"
         fi
     fi
 
@@ -300,7 +307,7 @@ UnmountAutorunPartition()
         exitcode=10
     fi
 
-    [[ $NAS_AUTORUN_FS = ubifs ]] && /sbin/ubidetach -m "$NAS_AUTORUN_PART" 2>/dev/null
+    [[ $r_nas_autorun_fs = ubifs ]] && /sbin/ubidetach -m "$r_nas_autorun_part" 2>/dev/null
 
     }
 
@@ -321,8 +328,8 @@ ShowResult()
     {
 
     [[ $exitcode -eq 0 ]] || return
-    [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into: $SCRIPT_STORE_PATH"
-    [[ -e $AUTORUN_PATHFILE ]] && ShowAsInfo "your '$AUTORUN_FILE' file is located at: $AUTORUN_PATHFILE"
+    [[ $script_store_created = true ]] && ShowAsInfo "please place your startup scripts into: $r_script_store_path"
+    [[ -e $r_autorun_pathfile ]] && ShowAsInfo "your '$r_autorun_file' file is located at: $r_autorun_pathfile"
 
     }
 
@@ -359,11 +366,11 @@ ShowAsError()
 Show()
     {
 
-    # Input:
+    # Inputs: (local)
     #   $1 = pass/fail
     #   $2 = message
 
-    printf '%-10s: %s\n' "$1" "$2"
+    printf '%-10s: %s\n' "${1:-}" "${2:-}"
 
     }
 
@@ -381,42 +388,42 @@ GetQnapOS()
 IsQuTS()
     {
 
-    /bin/grep -q zfs /proc/filesystems
+    /bin/grep zfs /proc/filesystems
 
-    }
+    } &> /dev/null
 
 TextBrightGreen()
     {
 
-    printf '\033[1;32m%s\033[0m' "$1"
+    printf '\033[1;32m%s\033[0m' "${1:-}"
 
     }
 
 TextBrightYellow()
     {
 
-    printf '\033[1;33m%s\033[0m' "$1"
+    printf '\033[1;33m%s\033[0m' "${1:-}"
 
     }
 
 TextBrightOrange()
     {
 
-    printf '\033[1;38;5;214m%s\033[0m' "$1"
+    printf '\033[1;38;5;214m%s\033[0m' "${1:-}"
 
     }
 
 TextBrightRed()
     {
 
-    printf '\033[1;31m%s\033[0m' "$1"
+    printf '\033[1;31m%s\033[0m' "${1:-}"
 
     }
 
 TextBrightWhite()
     {
 
-    printf '\033[1;97m%s\033[0m' "$1"
+    printf '\033[1;97m%s\033[0m' "${1:-}"
 
     }
 
