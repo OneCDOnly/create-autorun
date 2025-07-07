@@ -37,7 +37,7 @@ Init()
     {
 
     local -r r_script_file=create-autorun.sh
-    local -r r_script_version=250706
+    local -r r_script_version=250708
     exitcode=0
 
     # Include QNAP functions.
@@ -290,6 +290,8 @@ EnableAutorun()
         else
             ShowAsSkip "'$r_autorun_file' is already enabled in $(GetQnapOS)"
         fi
+    else
+        ShowAsInfo "'$r_autorun_file' is always enabled in this firmware version"
     fi
 
     }
